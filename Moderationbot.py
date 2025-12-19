@@ -245,44 +245,78 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
     # Moderation history
     mod_history = []
     try:
-        # Fetch audit logs for moderation actions - using target parameter instead of user
-        async for entry in interaction.guild.audit_logs(limit=100):
-            # Filter entries where this member was the target
-            if entry.target and entry.target.id == member.id:
-                if entry.action in [
-                    discord.AuditLogAction.kick,
-                    discord.AuditLogAction.ban,
-                    discord.AuditLogAction.member_update,  # For timeouts, mutes, deafens
-                    discord.AuditLogAction.unban
-                ]:
-                    action_name = entry.action.name.replace('_', ' ').title()
+        # Check if bot has permission to view audit logs
+        if not interaction.guild.me.guild_permissions.view_audit_log:
+            embed.add_field(name="📋 Moderation History", value="⚠️ Bot lacks permission to view audit logs",
+                            inline=False)
+        else:
+            # Fetch audit logs without any target filter
+            entries_checked = 0
+            async for entry in interaction.guild.audit_logs(limit=200):
+                # Check if this entry targets our member
+                if not entry.target:
+                    continue
+
+                # Compare IDs to filter for our specific member
+                target_id = None
+                if hasattr(entry.target, 'id'):
+                    target_id = entry.target.id
+                elif isinstance(entry.target, int):
+                    target_id = entry.target
+
+                if target_id != member.id:
+                    continue
+
+                entries_checked += 1
+
+                # Process different action types
+                if entry.action == discord.AuditLogAction.kick:
                     timestamp = entry.created_at.strftime("%Y-%m-%d %H:%M")
                     moderator = entry.user.mention if entry.user else "Unknown"
                     reason = entry.reason or "No reason provided"
+                    mod_history.append(f"👢 **Kick** - {timestamp}\nBy: {moderator}\nReason: {reason}")
 
-                    # Filter for timeout/mute/deafen actions
-                    if entry.action == discord.AuditLogAction.member_update:
-                        if hasattr(entry.before, 'timed_out_until') and hasattr(entry.after, 'timed_out_until'):
-                            if entry.before.timed_out_until != entry.after.timed_out_until:
-                                if entry.after.timed_out_until:
-                                    mod_history.append(f"⏱️ **Timeout** - {timestamp}\nBy: {moderator}\nReason: {reason}")
-                        # Note: Voice mute/deafen changes are harder to track via audit logs
-                    else:
-                        emoji = "👢" if entry.action == discord.AuditLogAction.kick else "🔨" if entry.action == discord.AuditLogAction.ban else "✅"
-                        mod_history.append(f"{emoji} **{action_name}** - {timestamp}\nBy: {moderator}\nReason: {reason}")
+                elif entry.action == discord.AuditLogAction.ban:
+                    timestamp = entry.created_at.strftime("%Y-%m-%d %H:%M")
+                    moderator = entry.user.mention if entry.user else "Unknown"
+                    reason = entry.reason or "No reason provided"
+                    mod_history.append(f"🔨 **Ban** - {timestamp}\nBy: {moderator}\nReason: {reason}")
 
-        if mod_history:
-            # Limit to last 5 actions to avoid embed size limits
-            history_text = "\n\n".join(mod_history[:5])
-            if len(mod_history) > 5:
-                history_text += f"\n\n*...and {len(mod_history) - 5} more action(s)*"
-            embed.add_field(name="📋 Moderation History", value=history_text, inline=False)
-        else:
-            embed.add_field(name="📋 Moderation History", value="No moderation actions found", inline=False)
+                elif entry.action == discord.AuditLogAction.unban:
+                    timestamp = entry.created_at.strftime("%Y-%m-%d %H:%M")
+                    moderator = entry.user.mention if entry.user else "Unknown"
+                    reason = entry.reason or "No reason provided"
+                    mod_history.append(f"✅ **Unban** - {timestamp}\nBy: {moderator}\nReason: {reason}")
+
+                elif entry.action == discord.AuditLogAction.member_update:
+                    # Check for timeout changes
+                    try:
+                        before_timeout = getattr(entry.before, 'timed_out_until', None)
+                        after_timeout = getattr(entry.after, 'timed_out_until', None)
+
+                        if before_timeout != after_timeout and after_timeout is not None:
+                            timestamp = entry.created_at.strftime("%Y-%m-%d %H:%M")
+                            moderator = entry.user.mention if entry.user else "Unknown"
+                            reason = entry.reason or "No reason provided"
+                            mod_history.append(f"⏱️ **Timeout** - {timestamp}\nBy: {moderator}\nReason: {reason}")
+                    except AttributeError:
+                        pass  # Skip if attributes don't exist
+
+            if mod_history:
+                # Limit to last 5 actions to avoid embed size limits
+                history_text = "\n\n".join(mod_history[:5])
+                if len(mod_history) > 5:
+                    history_text += f"\n\n*...and {len(mod_history) - 5} more action(s)*"
+                embed.add_field(name="📋 Moderation History", value=history_text, inline=False)
+            else:
+                embed.add_field(name="📋 Moderation History", value="No moderation actions found", inline=False)
+
     except discord.Forbidden:
-        embed.add_field(name="📋 Moderation History", value="⚠️ Cannot access audit logs", inline=False)
+        embed.add_field(name="📋 Moderation History", value="⚠️ Cannot access audit logs (Missing Permissions)",
+                        inline=False)
     except Exception as e:
-        embed.add_field(name="📋 Moderation History", value=f"⚠️ Error fetching audit logs: {str(e)}", inline=False)
+        embed.add_field(name="📋 Moderation History", value=f"⚠️ Error: {type(e).__name__}", inline=False)
+        print(f"Audit log error: {type(e).__name__}: {str(e)}")  # Log to console for debugging
 
     await interaction.response.send_message(embed=embed)
 
