@@ -67,6 +67,19 @@ async def start_web_server():
     print(f'Web server started on port {PORT}')
 
 
+@bot.event
+async def on_ready():
+    print(f'{bot.user} has connected to Discord!')
+    bot.loop.create_task(start_web_server())
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
+
+
+
 @bot.tree.command(name="kick", description="Kick a member from the server")
 @app_commands.describe(
     member="The member to kick",
@@ -143,6 +156,7 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
 )
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_mute(interaction: discord.Interaction, member: discord.Member, duration: int = 60, reason: str = None):
+
     if not interaction.guild.me.guild_permissions.moderate_members:
         await interaction.response.send_message("❌ I don't have permission to timeout members!", ephemeral=True)
         return
