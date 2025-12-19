@@ -299,3 +299,12 @@ async def prefix_ban(ctx, member: discord.Member, *, reason=None):
         return
     await member.ban(reason=reason)
     await ctx.send(f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}")
+
+
+if __name__ == "__main__":
+    if not TOKEN:
+        print("ERROR: DISCORD_TOKEN not found in environment variables!")
+        print("Make sure your .env file contains DISCORD_TOKEN=your_token_here")
+    else:
+        print("Starting bot...")
+        bot.run(TOKEN)
