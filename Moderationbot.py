@@ -209,9 +209,6 @@ async def slash_userbanner(interaction: discord.Interaction, member: discord.Mem
 @app_commands.describe(member="The member to get info about (leave empty for yourself)")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_userinfo(interaction: discord.Interaction, member: discord.Member = None):
-    # Defer the response to prevent timeout
-    await interaction.response.defer()
-
     member = member or interaction.user
 
     embed = discord.Embed(
@@ -247,15 +244,11 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
 
     # Moderation history
     mod_history = []
-
-    # Check if bot has audit log permissions
-    if not interaction.guild.me.guild_permissions.view_audit_log:
-        embed.add_field(name="📋 Moderation History",
-                        value="⚠️ Bot needs `View Audit Log` permission to show moderation history", inline=False)
-    else:
-        try:
-            # Fetch audit logs for moderation actions
-            async for entry in interaction.guild.audit_logs(limit=100, target=member):
+    try:
+        # Fetch audit logs for moderation actions - using target parameter instead of user
+        async for entry in interaction.guild.audit_logs(limit=100):
+            # Filter entries where this member was the target
+            if entry.target and entry.target.id == member.id:
                 if entry.action in [
                     discord.AuditLogAction.kick,
                     discord.AuditLogAction.ban,
@@ -272,30 +265,26 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
                         if hasattr(entry.before, 'timed_out_until') and hasattr(entry.after, 'timed_out_until'):
                             if entry.before.timed_out_until != entry.after.timed_out_until:
                                 if entry.after.timed_out_until:
-                                    mod_history.append(
-                                        f"⏱️ **Timeout** - {timestamp}\nBy: {moderator}\nReason: {reason}")
+                                    mod_history.append(f"⏱️ **Timeout** - {timestamp}\nBy: {moderator}\nReason: {reason}")
                         # Note: Voice mute/deafen changes are harder to track via audit logs
                     else:
                         emoji = "👢" if entry.action == discord.AuditLogAction.kick else "🔨" if entry.action == discord.AuditLogAction.ban else "✅"
-                        mod_history.append(
-                            f"{emoji} **{action_name}** - {timestamp}\nBy: {moderator}\nReason: {reason}")
+                        mod_history.append(f"{emoji} **{action_name}** - {timestamp}\nBy: {moderator}\nReason: {reason}")
 
-            if mod_history:
-                # Limit to last 5 actions to avoid embed size limits
-                history_text = "\n\n".join(mod_history[:5])
-                if len(mod_history) > 5:
-                    history_text += f"\n\n*...and {len(mod_history) - 5} more action(s)*"
-                embed.add_field(name="📋 Moderation History", value=history_text, inline=False)
-            else:
-                embed.add_field(name="📋 Moderation History", value="No moderation actions found", inline=False)
-        except discord.Forbidden:
-            embed.add_field(name="📋 Moderation History", value="⚠️ Cannot access audit logs (missing permissions)",
-                            inline=False)
-        except Exception as e:
-            embed.add_field(name="📋 Moderation History", value=f"⚠️ Error fetching audit logs: {str(e)}", inline=False)
+        if mod_history:
+            # Limit to last 5 actions to avoid embed size limits
+            history_text = "\n\n".join(mod_history[:5])
+            if len(mod_history) > 5:
+                history_text += f"\n\n*...and {len(mod_history) - 5} more action(s)*"
+            embed.add_field(name="📋 Moderation History", value=history_text, inline=False)
+        else:
+            embed.add_field(name="📋 Moderation History", value="No moderation actions found", inline=False)
+    except discord.Forbidden:
+        embed.add_field(name="📋 Moderation History", value="⚠️ Cannot access audit logs", inline=False)
+    except Exception as e:
+        embed.add_field(name="📋 Moderation History", value=f"⚠️ Error fetching audit logs: {str(e)}", inline=False)
 
-    # Use followup instead of response since we deferred
-    await interaction.followup.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
 
 #error handling
