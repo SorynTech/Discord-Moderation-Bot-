@@ -75,8 +75,13 @@ async def on_ready():
     try:
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} command(s)")
+    except discord.Forbidden as e:
+        print(f"Failed to sync commands (insufficient permissions): {e}")
+    except discord.HTTPException as e:
+        print(f"Failed to sync commands (HTTP error): {e}")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
+        print(f"Failed to sync commands (unexpected error): {e}")
+        raise
 
 
 
