@@ -6,6 +6,17 @@ import datetime
 import requests
 import random as r
 from aiohttp import web
+import logging
+
+# Set up logging to see rate limit info
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+
+# Create handler
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -73,16 +84,26 @@ async def on_ready():
     bot.loop.create_task(start_web_server())
 
     try:
+        print("Attempting to sync commands...")
         synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
+        print(f"✅ Successfully synced {len(synced)} command(s)")
     except discord.Forbidden as e:
-        print(f"Failed to sync commands (insufficient permissions): {e}")
+        print(f"❌ Failed to sync commands (insufficient permissions): {e}")
     except discord.HTTPException as e:
-        print(f"Failed to sync commands (HTTP error): {e}")
+        print(f"❌ Failed to sync commands (HTTP error): {e}")
+        print(f"Status: {e.status}")
+        print(f"Response: {e.text}")
     except Exception as e:
-        print(f"Failed to sync commands (unexpected error): {e}")
-        raise
+        print(f"❌ Failed to sync commands (unexpected error): {e}")
+        import traceback
+        traceback.print_exc()
 
+
+# Add event handler for rate limits
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        print(f"⏰ Command on cooldown: {error}")
 
 
 @bot.tree.command(name="kick", description="Kick a member from the server")
@@ -92,19 +113,21 @@ async def on_ready():
 )
 @app_commands.checks.has_permissions(kick_members=True)
 async def slash_kick(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    await interaction.response.defer()
+
     if not interaction.guild.me.guild_permissions.kick_members:
-        await interaction.response.send_message("❌ I don't have permission to kick members!", ephemeral=True)
+        await interaction.followup.send("❌ I don't have permission to kick members!", ephemeral=True)
         return
 
     if member.top_role >= interaction.guild.me.top_role:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ I cannot kick this member (their role is equal or higher than mine)!",
             ephemeral=True
         )
         return
 
     await member.kick(reason=reason)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}"
     )
 
@@ -116,19 +139,21 @@ async def slash_kick(interaction: discord.Interaction, member: discord.Member, r
 )
 @app_commands.checks.has_permissions(ban_members=True)
 async def slash_ban(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    await interaction.response.defer()
+
     if not interaction.guild.me.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ I don't have permission to ban members!", ephemeral=True)
+        await interaction.followup.send("❌ I don't have permission to ban members!", ephemeral=True)
         return
 
     if member.top_role >= interaction.guild.me.top_role:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ I cannot ban this member (their role is equal or higher than mine)!",
             ephemeral=True
         )
         return
 
     await member.ban(reason=reason)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}"
     )
 
@@ -139,20 +164,22 @@ async def slash_ban(interaction: discord.Interaction, member: discord.Member, re
 )
 @app_commands.checks.has_permissions(ban_members=True)
 async def slash_unban(interaction: discord.Interaction, user_id: str):
+    await interaction.response.defer()
+
     if not interaction.guild.me.guild_permissions.ban_members:
-        await interaction.response.send_message("❌ I don't have permission to unban members!", ephemeral=True)
+        await interaction.followup.send("❌ I don't have permission to unban members!", ephemeral=True)
         return
 
     try:
         user = await bot.fetch_user(int(user_id))
         await interaction.guild.unban(user)
-        await interaction.response.send_message(f"✅ {user.mention} has been unbanned.")
+        await interaction.followup.send(f"✅ {user.mention} has been unbanned.")
     except discord.NotFound:
-        await interaction.response.send_message("❌ User not found or not banned.", ephemeral=True)
+        await interaction.followup.send("❌ User not found or not banned.", ephemeral=True)
     except discord.Forbidden:
-        await interaction.response.send_message("❌ I don't have permission to unban this user!", ephemeral=True)
+        await interaction.followup.send("❌ I don't have permission to unban this user!", ephemeral=True)
     except ValueError:
-        await interaction.response.send_message("❌ Invalid user ID!", ephemeral=True)
+        await interaction.followup.send("❌ Invalid user ID!", ephemeral=True)
 
 
 @bot.tree.command(name="mute", description="Timeout a member")
@@ -163,13 +190,14 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
 )
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_mute(interaction: discord.Interaction, member: discord.Member, duration: int = 60, reason: str = None):
+    await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.moderate_members:
-        await interaction.response.send_message("❌ I don't have permission to timeout members!", ephemeral=True)
+        await interaction.followup.send("❌ I don't have permission to timeout members!", ephemeral=True)
         return
 
     if member.top_role >= interaction.guild.me.top_role:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ I cannot mute this member (their role is equal or higher than mine)!",
             ephemeral=True
         )
@@ -177,7 +205,7 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
 
     duration_td = datetime.timedelta(seconds=duration)
     await member.timeout(duration_td, reason=reason)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ {member.mention} has been muted for {duration} seconds. Reason: {reason or 'No reason provided'}"
     )
 
@@ -187,8 +215,9 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
 @app_commands.checks.has_permissions(send_messages=True)
 @app_commands.checks.has_permissions(embed_links=True)
 async def slash_userpicture(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
     picture = member.display_avatar.url
-    await interaction.response.send_message(picture)
+    await interaction.followup.send(picture)
 
 
 @bot.tree.command(name="userbanner", description="Get a user's nitro banner")
@@ -196,19 +225,22 @@ async def slash_userpicture(interaction: discord.Interaction, member: discord.Me
 @app_commands.checks.has_permissions(send_messages=True)
 @app_commands.checks.has_permissions(embed_links=True)
 async def slash_userbanner(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
     user = await bot.fetch_user(member.id)
 
     if user.banner:
         banner = user.banner.url
-        await interaction.response.send_message(banner)
+        await interaction.followup.send(banner)
     else:
-        await interaction.response.send_message(f"{member.mention} does not have a banner.")
+        await interaction.followup.send(f"{member.mention} does not have a banner.")
 
 
 @bot.tree.command(name="userinfo", description="Get information about a user")
 @app_commands.describe(member="The member to get info about (leave empty for yourself)")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_userinfo(interaction: discord.Interaction, member: discord.Member = None):
+    await interaction.response.defer()
+
     member = member or interaction.user
 
     embed = discord.Embed(
@@ -318,10 +350,10 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
         embed.add_field(name="📋 Moderation History", value=f"⚠️ Error: {type(e).__name__}", inline=False)
         print(f"Audit log error: {type(e).__name__}: {str(e)}")  # Log to console for debugging
 
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed)
 
 
-#error handling
+# error handling
 @slash_ban.error
 @slash_kick.error
 @slash_mute.error
@@ -331,10 +363,16 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
 @slash_userinfo.error
 async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message(
-            "❌ You don't have permission to use this command!",
-            ephemeral=True
-        )
+        try:
+            await interaction.response.send_message(
+                "❌ You don't have permission to use this command!",
+                ephemeral=True
+            )
+        except:
+            await interaction.followup.send(
+                "❌ You don't have permission to use this command!",
+                ephemeral=True
+            )
 
 
 @bot.command(name='kick')
@@ -364,9 +402,21 @@ async def prefix_ban(ctx, member: discord.Member, *, reason=None):
 
 
 if __name__ == "__main__":
+    print("=== BOT STARTING ===")
+    print(f"TOKEN exists: {bool(TOKEN)}")
+    print(f"PORT: {PORT}")
+
     if not TOKEN:
         print("ERROR: DISCORD_TOKEN not found in environment variables!")
         print("Make sure your .env file contains DISCORD_TOKEN=your_token_here")
     else:
         print("Starting bot...")
-        bot.run(TOKEN)
+        try:
+            bot.run(TOKEN, log_handler=None)  # Use our custom logging
+        except Exception as e:
+            print(f"BOT CRASHED: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+    print("=== BOT EXITED ===")
