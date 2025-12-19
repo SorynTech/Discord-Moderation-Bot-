@@ -67,6 +67,24 @@ async def start_web_server():
     print(f'Web server started on port {PORT}')
 
 
+@bot.event
+async def on_ready():
+    print(f'{bot.user} has connected to Discord!')
+    bot.loop.create_task(start_web_server())
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} command(s)")
+    except discord.Forbidden as e:
+        print(f"Failed to sync commands (insufficient permissions): {e}")
+    except discord.HTTPException as e:
+        print(f"Failed to sync commands (HTTP error): {e}")
+    except Exception as e:
+        print(f"Failed to sync commands (unexpected error): {e}")
+        raise
+
+
+
 @bot.tree.command(name="kick", description="Kick a member from the server")
 @app_commands.describe(
     member="The member to kick",
@@ -135,6 +153,8 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
         await interaction.response.send_message("❌ I don't have permission to unban this user!", ephemeral=True)
     except ValueError:
         await interaction.response.send_message("❌ Invalid user ID!", ephemeral=True)
+
+
 @bot.tree.command(name="mute", description="Timeout a member")
 @app_commands.describe(
     member="The member to mute",
@@ -143,6 +163,7 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
 )
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_mute(interaction: discord.Interaction, member: discord.Member, duration: int = 60, reason: str = None):
+
     if not interaction.guild.me.guild_permissions.moderate_members:
         await interaction.response.send_message("❌ I don't have permission to timeout members!", ephemeral=True)
         return
@@ -159,6 +180,7 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
     await interaction.response.send_message(
         f"✅ {member.mention} has been muted for {duration} seconds. Reason: {reason or 'No reason provided'}"
     )
+
 
 @bot.tree.command(name="userpicture", description="Get a User's Profile Picture")
 @app_commands.describe(member="The member to get picture of")
@@ -185,7 +207,7 @@ async def slash_userbanner(interaction: discord.Interaction, member: discord.Mem
 
 @bot.tree.command(name="userinfo", description="Get information about a user")
 @app_commands.describe(member="The member to get info about (leave empty for yourself)")
-@app_commands.checks.has_permissions(manage_members=True)
+@app_commands.checks.has_permissions(moderate_members=True)
 async def slash_userinfo(interaction: discord.Interaction, member: discord.Member = None):
     member = member or interaction.user
 
@@ -259,13 +281,14 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
 
     await interaction.response.send_message(embed=embed)
 
+
 #error handling
 @slash_ban.error
 @slash_kick.error
 @slash_mute.error
 @slash_unban.error
 @slash_userpicture.error
-@slash_userinfo.error
+@slash_userbanner.error
 @slash_userinfo.error
 async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
