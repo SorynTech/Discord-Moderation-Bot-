@@ -210,6 +210,87 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
     )
 
 
+@bot.tree.command(name="unmute", description="Unmute a member")
+@app_commands.describe(member="The member to unmute")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_unmute(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
+
+    if not interaction.guild.me.guild_permissions.moderate_members:
+        await interaction.followup.send("❌ I don't have permission!", ephemeral=True)
+        return
+
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.followup.send(
+            "❌ I cannot unmute this member (their role is equal or higher than mine)!",
+            ephemeral=True
+        )
+        return
+
+    # Check if member is currently muted
+    if member.timed_out_until is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not currently muted!",
+            ephemeral=True
+        )
+        return
+
+    # Unmute the member by removing the timeout
+    try:
+        await member.timeout(None, reason=f"Unmuted by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully unmuted {member.mention}!"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "❌ I don't have permission to unmute this member!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        await interaction.followup.send(
+            f"❌ An error occurred: {e}",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="dc", description="Disconnect a user from voice")
+@app_commands.describe(member="member to disconnect")
+@app_commands.checks.has_permissions(send_polls=True)
+async def slash_disconnect(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer
+    # Check if bot has permission
+    if not interaction.guild.me.guild_permissions.move_members:
+        await interaction.followup.send("❌ I don't have permission to move members!", ephemeral=True)
+        return
+    # Check if member is in a voice channel
+    if member.voice is None or member.voice.channel is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not in a voice channel!",
+            ephemeral=True
+        )
+        # Check role hierarchy
+        if member.top_role >= interaction.guild.me.top_role:
+            await interaction.followup.send(
+                "❌ I cannot disconnect this member (their role is equal or higher than mine)!",
+                ephemeral=True
+            )
+        try:
+            await member.move_to(None, reason=f"Disconnected by {interaction.user}")
+            await interaction.followup.send("Succsesfully Disconnected Member :sleepy:", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "❌ I don't have permission to disconnect this member!",
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await interaction.followup.send(
+                f"❌ An error occurred: {e}",
+                ephemeral=True
+            )
+
+
+
+
 @bot.tree.command(name="userpicture", description="Get a User's Profile Picture")
 @app_commands.describe(member="The member to get picture of")
 @app_commands.checks.has_permissions(send_messages=True)
@@ -218,6 +299,7 @@ async def slash_userpicture(interaction: discord.Interaction, member: discord.Me
     await interaction.response.defer()
     picture = member.display_avatar.url
     await interaction.followup.send(picture)
+
 
 
 @bot.tree.command(name="userbanner", description="Get a user's nitro banner")
@@ -352,6 +434,195 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
 
     await interaction.followup.send(embed=embed)
 
+@bot.tree.command(name="sdeaf", description="Deafen a user")
+@app_commands.describe(member="The member to deafen")
+@app_commands.checks.has_permissions(send_polls=True)
+async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
+    # Check if bot has permission
+    if not interaction.guild.me.guild_permissions.deafen_members:
+        await interaction.followup.send("❌ I don't have permission to deafen members!", ephemeral=True)
+        return
+
+    # Check if member is in a voice channel
+    if member.voice is None or member.voice.channel is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not in a voice channel!",
+            ephemeral=True
+        )
+        return
+
+    # Check if member is already deafened
+    if member.voice.deaf:
+        await interaction.followup.send(
+            f"❌ {member.mention} is already server deafened!",
+            ephemeral=True
+        )
+        return
+
+    # Check role hierarchy
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.followup.send(
+            "❌ I cannot deafen this member (their role is equal or higher than mine)!",
+            ephemeral=True
+        )
+        return
+
+    # Deafen the member
+    try:
+        await member.edit(deafen=True, reason=f"Server deafened by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully server deafened {member.mention}!"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "❌ I don't have permission to deafen this member!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        await interaction.followup.send(
+            f"❌ An error occurred: {e}",
+            ephemeral=True
+        )
+@bot.tree.command(name="smute",description="Mute a user")
+@app_commands.describe(member="The member to mute")
+@app_commands.checks.has_permissions(send_polls=True)
+async def slash_mute(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
+    if not interaction.guild.me.guild_permissions.mute_members:
+        await interaction.followup.send("I dont have permissions :angry_face:")
+        return
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.followup.send("Member role is too high or my role is too low")
+        return
+        # Check if member is already deafened
+    if member.voice.mute:
+        await interaction.followup.send(
+            f"❌ {member.mention} is already server muted!",
+            ephemeral=True
+            )
+        return
+    try:
+        await member.edit(mute=True, reason=f"Server muted by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully server deafened {member.mention}!"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "❌ I don't have permission to deafen this member!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        await interaction.followup.send(
+            f"❌ An error occurred: {e}",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="smuteno", description="Unmute a user from voice")
+@app_commands.describe(member="The member to unmute")
+@app_commands.checks.has_permissions(send_polls=True)
+async def slash_unmute_voice(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
+
+    # Check if bot has permission
+    if not interaction.guild.me.guild_permissions.mute_members:
+        await interaction.followup.send("❌ I don't have permission to mute/unmute members!", ephemeral=True)
+        return
+
+    # Check if member is in a voice channel
+    if member.voice is None or member.voice.channel is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not in a voice channel!",
+            ephemeral=True
+        )
+        return
+
+    # Check if member is actually muted
+    if not member.voice.mute:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not server muted!",
+            ephemeral=True
+        )
+        return
+
+    # Check role hierarchy
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.followup.send(
+            "❌ I cannot unmute this member (their role is equal or higher than mine)!",
+            ephemeral=True
+        )
+        return
+
+    # Unmute the member
+    try:
+        await member.edit(mute=False, reason=f"Server unmuted by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully server unmuted {member.mention}!"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "❌ I don't have permission to unmute this member!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        await interaction.followup.send(
+            f"❌ An error occurred: {e}",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="sdeafno", description="Undeafen a user from voice")
+@app_commands.describe(member="The member to undeafen")
+@app_commands.checks.has_permissions(send_polls=True)
+async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer()
+
+    # Check if bot has permission
+    if not interaction.guild.me.guild_permissions.deafen_members:
+        await interaction.followup.send("❌ I don't have permission to deafen/undeafen members!", ephemeral=True)
+        return
+
+    # Check if member is in a voice channel
+    if member.voice is None or member.voice.channel is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not in a voice channel!",
+            ephemeral=True
+        )
+        return
+
+    # Check if member is actually deafened
+    if not member.voice.deaf:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not server deafened!",
+            ephemeral=True
+        )
+        return
+
+    # Check role hierarchy
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.followup.send(
+            "❌ I cannot undeafen this member (their role is equal or higher than mine)!",
+            ephemeral=True
+        )
+        return
+
+    # Undeafen the member
+    try:
+        await member.edit(deafen=False, reason=f"Server undeafened by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully server undeafened {member.mention}!"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "❌ I don't have permission to undeafen this member!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        await interaction.followup.send(
+            f"❌ An error occurred: {e}",
+            ephemeral=True
+        )
 
 # error handling
 @slash_ban.error
