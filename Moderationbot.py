@@ -254,39 +254,47 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
 
 
 @bot.tree.command(name="dc", description="Disconnect a user from voice")
-@app_commands.describe(member="member to disconnect")
-@app_commands.checks.has_permissions(send_polls=True)
+@app_commands.describe(member="Member to disconnect")
+@app_commands.checks.has_permissions(move_members=True)
 async def slash_disconnect(interaction: discord.Interaction, member: discord.Member):
-    await interaction.response.defer()
     # Check if bot has permission
     if not interaction.guild.me.guild_permissions.move_members:
-        await interaction.followup.send("❌ I don't have permission to move members!", ephemeral=True)
+        await interaction.response.send_message("❌ I don't have permission to move members!", ephemeral=True)
         return
+
     # Check if member is in a voice channel
     if member.voice is None or member.voice.channel is None:
-        await interaction.followup.send(
+        await interaction.response.send_message(
             f"❌ {member.mention} is not in a voice channel!",
             ephemeral=True
         )
-        # Check role hierarchy
-        if member.top_role >= interaction.guild.me.top_role:
-            await interaction.followup.send(
-                "❌ I cannot disconnect this member (their role is equal or higher than mine)!",
-                ephemeral=True
-            )
-        try:
-            await member.move_to(None, reason=f"Disconnected by {interaction.user}")
-            await interaction.followup.send("Succsesfully Disconnected Member :sleepy:", ephemeral=True)
-        except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ I don't have permission to disconnect this member!",
-                ephemeral=True
-            )
-        except discord.HTTPException as e:
-            await interaction.followup.send(
-                f"❌ An error occurred: {e}",
-                ephemeral=True
-            )
+        return
+
+    # Check role hierarchy
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.response.send_message(
+            "❌ I cannot disconnect this member (their role is equal or higher than mine)!",
+            ephemeral=True
+        )
+        return
+
+    # Disconnect the member
+    try:
+        await interaction.response.defer()  # Only defer right before the action
+        await member.move_to(None, reason=f"Disconnected by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully disconnected {member.mention}!"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "❌ I don't have permission to disconnect this member!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        await interaction.followup.send(
+            f"❌ An error occurred: {e}",
+            ephemeral=True
+        )
 
 
 
