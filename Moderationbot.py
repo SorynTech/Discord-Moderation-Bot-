@@ -11,6 +11,7 @@ import logging
 bot_start_time = None
 if bot_start_time is None:
     bot_start_time = datetime.datetime.now()
+#End Initalization
 
 
 # Set up logging to see rate limit info
