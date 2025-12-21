@@ -257,7 +257,7 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
 @app_commands.describe(member="member to disconnect")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_disconnect(interaction: discord.Interaction, member: discord.Member):
-    await interaction.response.defer
+    await interaction.response.defer()
     # Check if bot has permission
     if not interaction.guild.me.guild_permissions.move_members:
         await interaction.followup.send("❌ I don't have permission to move members!", ephemeral=True)
