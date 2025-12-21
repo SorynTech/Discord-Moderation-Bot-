@@ -206,12 +206,11 @@ async def health_check(request):
                 </div>
             </div>
         </div>
-    </body>
+</body>
     </html>
-    """
+"""
     return web.Response(text=html, content_type='text/html')
-     """
-     return web.Response(text=html, content_type='text/html')
+
 
 
 async def start_web_server():
