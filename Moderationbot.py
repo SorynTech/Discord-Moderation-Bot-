@@ -8,6 +8,7 @@ import random as r
 from aiohttp import web
 import logging
 # Track bot start time for uptime
+bot_start_time = None
 if bot_start_time is None:
     bot_start_time = datetime.datetime.now()
 
