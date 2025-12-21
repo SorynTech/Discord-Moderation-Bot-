@@ -7,6 +7,12 @@ import requests
 import random as r
 from aiohttp import web
 import logging
+# Track bot start time for uptime
+bot_start_time = None
+if bot_start_time is None:
+    bot_start_time = datetime.datetime.now()
+#End Initalization
+
 
 # Set up logging to see rate limit info
 logging.basicConfig(level=logging.INFO)
@@ -63,7 +69,149 @@ else:
 
 
 async def health_check(request):
-    return web.Response(text="Bot is running!")
+    if bot_start_time is None:
+        return web.Response(
+            text="Bot is starting up, please wait...",
+            content_type='text/plain',
+            status=503
+        )
+
+    uptime = datetime.datetime.now() - bot_start_time
+    hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Discord Bot Status</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }}
+            .container {{
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                padding: 40px;
+                max-width: 500px;
+                width: 100%;
+                text-align: center;
+            }}
+            .status-icon {{
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin: 0 auto 20px;
+                animation: pulse 2s infinite;
+            }}
+            @keyframes pulse {{
+                0%, 100% {{
+                    transform: scale(1);
+                    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+                }}
+                50% {{
+                    transform: scale(1.05);
+                    box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+                }}
+            }}
+            .checkmark {{
+                font-size: 40px;
+                color: white;
+            }}
+            h1 {{
+                color: #333;
+                margin-bottom: 10px;
+                font-size: 28px;
+            }}
+            .status {{
+                color: #4CAF50;
+                font-weight: bold;
+                font-size: 18px;
+                margin-bottom: 30px;
+            }}
+            .info-grid {{
+                display: grid;
+                gap: 15px;
+                margin-top: 30px;
+            }}
+            .info-item {{
+                background: #f5f5f5;
+                padding: 15px;
+                border-radius: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            .info-label {{
+                color: #666;
+                font-weight: 500;
+            }}
+            .info-value {{
+                color: #333;
+                font-weight: bold;
+            }}
+            .bot-name {{
+                color: #667eea;
+                font-weight: bold;
+            }}
+            @media (max-width: 480px) {{
+                .container {{
+                    padding: 30px 20px;
+                }}
+                h1 {{
+                    font-size: 24px;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="status-icon">
+                <span class="checkmark">✓</span>
+            </div>
+            <h1>Bot is <span class="status">Online</span></h1>
+            <p style="color: #666; margin-bottom: 20px;">All systems operational</p>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Bot Name</span>
+                    <span class="info-value bot-name">{bot.user.name if bot.user else "Loading..."}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Uptime</span>
+                    <span class="info-value">{hours}h {minutes}m {seconds}s</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Servers</span>
+                    <span class="info-value">{len(bot.guilds)}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Latency</span>
+                    <span class="info-value">{round(bot.latency * 1000)}ms</span>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return web.Response(text=html, content_type='text/html')
+     """
+     return web.Response(text=html, content_type='text/html')
 
 
 async def start_web_server():
@@ -80,6 +228,8 @@ async def start_web_server():
 
 @bot.event
 async def on_ready():
+    global bot_start_time
+    bot_start_time = datetime.datetime.now()
     print(f'{bot.user} has connected to Discord!')
     bot.loop.create_task(start_web_server())
 
