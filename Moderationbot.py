@@ -27,7 +27,7 @@ logger.addHandler(handler)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-
+intents.presences = True  # Add this line
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 
