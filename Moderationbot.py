@@ -644,7 +644,7 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
 @bot.tree.command(name="smute",description="Mute a user")
 @app_commands.describe(member="The member to mute")
 @app_commands.checks.has_permissions(send_polls=True)
-async def slash_mute(interaction: discord.Interaction, member: discord.Member):
+async def slash_servermute(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.defer()
     if not interaction.guild.me.guild_permissions.mute_members:
         await interaction.followup.send("I dont have permissions :angry_face:")
@@ -780,15 +780,264 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
             f"❌ An error occurred: {e}",
             ephemeral=True
         )
+@bot.tree.command(name="purge", description="Mass Delete Messages")
+@app_commands.checks.has_permissions(manage_messages=True)
+@app_commands.describe(msgamount="How many Messages you want to delete")
+async def slash_purge_messages(interaction: discord.Interaction, msgamount: int):
+    await interaction.response.defer()
+    if not interaction.guild.me.guild_permissions.manage_messages:
+        await interaction.followup.send("I do not have Permissions!", ephemeral=True)
+        return
+    if msgamount <= 0:
+        await interaction.followup.send("The message amount needs to be greater than 0!", ephemeral=True)
+        return
+    if msgamount > 100:
+        await interaction.followup.send("You cannot do over 100 messages at a time", ephemeral=True)
+        return
+    try:
+        deleted = await interaction.channel.purge(limit=msgamount)
+        await interaction.followup.send(f"Successfully deleted {len(deleted)} messages!", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send("I don't have permission to delete messages in this channel!", ephemeral=True)
+    except discord.HTTPException as e:
+        await interaction.followup.send(f"An error occurred while deleting messages: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="lockdown", description="Lock down the server")
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.describe(message="(Optional) Lockdown Message")
+async def slash_lockdown(interaction: discord.Interaction, message: str = None):
+    await interaction.response.defer()
+
+    if not interaction.guild.me.guild_permissions.manage_channels:
+        await interaction.followup.send("I do not have Permissions to manage channels!", ephemeral=True)
+        return
+    if not interaction.guild.me.guild_permissions.administrator:
+        await interaction.followup.send("I do not have administrator permissions!", ephemeral=True)
+        return
+
+    try:
+        locked_count = 0
+        failed_channels = []
+
+        # Loop through all text channels
+        for channel in interaction.guild.text_channels:
+            try:
+                # Deny send messages for @everyone role
+                await channel.set_permissions(
+                    interaction.guild.default_role,
+                    send_messages=False,
+                    reason=f"Server lockdown by {interaction.user}"
+                )
+                locked_count += 1
+            except discord.Forbidden:
+                failed_channels.append(channel.name)
+            except discord.HTTPException:
+                failed_channels.append(channel.name)
+
+        # Send response
+        response = f"🔒 **Server Locked Down**\n✅ Locked {locked_count} channels"
+        if failed_channels:
+            response += f"\n❌ Failed to lock: {', '.join(failed_channels)}"
+        if message:
+            response += f"\n\n📢 **Message:** {message}"
+
+        await interaction.followup.send(response)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ An error occurred during lockdown: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="killswitch", description="Emergency bot shutdown (Owner Only)")
+async def slash_killswitch(interaction: discord.Interaction):
+    # Check if user is the bot owner
+    if interaction.user.id != 447812883158532106:
+        await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
+        return
+
+    await interaction.response.send_message("🔴 **EMERGENCY SHUTDOWN INITIATED**\nBot is shutting down...")
+
+    # Close the bot
+    await bot.close()
+
+@bot.tree.command(name="ping", description="Check the bot's latency")
+async def slash_ping(interaction: discord.Interaction):
+    latency = round(bot.latency * 1000)
+
+    embed = discord.Embed(
+        title="🏓 Pong!",
+        description=f"Bot Latency: **{latency}ms**",
+        color=discord.Color.green() if latency < 100 else discord.Color.orange() if latency < 200 else discord.Color.red()
+    )
+
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="unlockserver", description="Unlock the server")
+@app_commands.checks.has_permissions(administrator=True)
+async def slash_unlockserver(interaction: discord.Interaction):
+    await interaction.response.defer()
+
+    if not interaction.guild.me.guild_permissions.manage_channels:
+        await interaction.followup.send("I do not have Permissions to manage channels!", ephemeral=True)
+        return
+    if not interaction.guild.me.guild_permissions.administrator:
+        await interaction.followup.send("I do not have administrator permissions!", ephemeral=True)
+        return
+
+    try:
+        unlocked_count = 0
+        failed_channels = []
+
+        # Loop through all text channels
+        for channel in interaction.guild.text_channels:
+            try:
+                # Re-enable send messages for @everyone role
+                await channel.set_permissions(
+                    interaction.guild.default_role,
+                    send_messages=None,  # None resets to default/removes override
+                    reason=f"Server unlocked by {interaction.user}"
+                )
+                unlocked_count += 1
+            except discord.Forbidden:
+                failed_channels.append(channel.name)
+            except discord.HTTPException:
+                failed_channels.append(channel.name)
+
+        # Send response
+        response = f"🔓 **Server Unlocked**\n✅ Unlocked {unlocked_count} channels"
+        if failed_channels:
+            response += f"\n❌ Failed to unlock: {', '.join(failed_channels)}"
+
+        await interaction.followup.send(response)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ An error occurred during unlock: {e}", ephemeral=True)
+
+@bot.tree.command(name="nickname", description="Change a users nickname")
+@app_commands.checks.has_permissions(manage_nicknames=True)
+@app_commands.describe(
+    member="The member to change nickname",
+    nickname="New nickname (leave empty to reset)"
+)
+@app_commands.checks.has_permissions(manage_nicknames=True)
+async def slash_nickname(interaction: discord.Interaction, member: discord.Member, nickname: str = None):
+    await interaction.response.defer()
+    if not interaction.guild.me.guild_permissions.manage_nicknames:
+        await interaction.followup.send("❌ I don't have permission to manage nicknames!", ephemeral=True)
+        return
+    if member.top_role >= interaction.guild.me.top_role:
+        await interaction.followup.send(
+            "❌ I cannot change this member's nickname (their role is equal or higher than mine)!",
+            ephemeral=True
+        )
+        return
+    try:
+        old_nick = member.nick or member.name
+        await member.edit(nick=nickname, reason=f"Nickname changed by {interaction.user}")
+
+        if nickname:
+            await interaction.followup.send(
+                f"✅ Changed {member.mention}'s nickname from **{old_nick}** to **{nickname}**")
+        else:
+            await interaction.followup.send(f"✅ Reset {member.mention}'s nickname (was **{old_nick}**)")
+
+    except discord.Forbidden:
+        await interaction.followup.send("❌ I don't have permission to change this member's nickname!", ephemeral=True)
+    except discord.HTTPException as e:
+        await interaction.followup.send(f"❌ An error occurred: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="serverinfo", description="Display server information")
+async def slash_serverinfo(interaction: discord.Interaction):
+    await interaction.response.defer()
+
+    guild = interaction.guild
+
+    # Count members by status
+    online = sum(1 for m in guild.members if m.status == discord.Status.online)
+    idle = sum(1 for m in guild.members if m.status == discord.Status.idle)
+    dnd = sum(1 for m in guild.members if m.status == discord.Status.dnd)
+    offline = sum(1 for m in guild.members if m.status == discord.Status.offline)
+
+    # Count bots
+    bots = sum(1 for m in guild.members if m.bot)
+    humans = len(guild.members) - bots
+
+    embed = discord.Embed(
+        title=f"📊 {guild.name} Server Information",
+        color=discord.Color.blue(),
+        timestamp=datetime.datetime.now()
+    )
+
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+
+    # Basic Info
+    embed.add_field(name="Server ID", value=guild.id, inline=True)
+    embed.add_field(name="Owner", value=guild.owner.mention if guild.owner else "Unknown", inline=True)
+    embed.add_field(name="Created On", value=guild.created_at.strftime("%Y-%m-%d"), inline=True)
+
+    # Member Stats
+    embed.add_field(
+        name=f"Members ({len(guild.members)})",
+        value=f"👤 Humans: {humans}\n🤖 Bots: {bots}",
+        inline=True
+    )
+
+    embed.add_field(
+        name="Member Status",
+        value=f"🟢 {online} | 🟡 {idle} | 🔴 {dnd} | ⚫ {offline}",
+        inline=True
+    )
+
+    # Channel Stats
+    text_channels = len(guild.text_channels)
+    voice_channels = len(guild.voice_channels)
+    categories = len(guild.categories)
+
+    embed.add_field(
+        name="Channels",
+        value=f"💬 Text: {text_channels}\n🔊 Voice: {voice_channels}\n📁 Categories: {categories}",
+        inline=True
+    )
+
+    # Role and Emoji Info
+    embed.add_field(name="Roles", value=len(guild.roles), inline=True)
+    embed.add_field(name="Emojis", value=len(guild.emojis), inline=True)
+    embed.add_field(name="Boosts", value=f"Level {guild.premium_tier} ({guild.premium_subscription_count} boosts)",
+                    inline=True)
+
+    # Server Features
+    if guild.features:
+        features = ", ".join([f.replace("_", " ").title() for f in guild.features[:5]])
+        if len(guild.features) > 5:
+            features += f" (+{len(guild.features) - 5} more)"
+        embed.add_field(name="Features", value=features, inline=False)
+
+    await interaction.followup.send(embed=embed)
+
+
+
 
 # error handling
 @slash_ban.error
 @slash_kick.error
 @slash_mute.error
+@slash_servermute.error
 @slash_unban.error
 @slash_userpicture.error
 @slash_userbanner.error
 @slash_userinfo.error
+@slash_disconnect.error
+@slash_deaf.error
+@slash_unmute_voice.error
+@slash_undeaf_voice.error
+@slash_purge_messages.error
+@slash_lockdown.error
+@slash_unlockserver.error
+@slash_nickname.error
+@slash_serverinfo.error
 async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
         try:
@@ -827,6 +1076,7 @@ async def prefix_ban(ctx, member: discord.Member, *, reason=None):
         return
     await member.ban(reason=reason)
     await ctx.send(f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}")
+
 
 
 if __name__ == "__main__":
