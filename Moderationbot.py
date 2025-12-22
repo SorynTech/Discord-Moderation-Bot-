@@ -987,7 +987,7 @@ async def slash_serverinfo(interaction: discord.Interaction):
 
     embed.add_field(
         name="Member Status",
-        value=f"🟢 {online} | 🟡 {idle} | 🔴 {dnd} | ⚫ {offline}",
+        value=f"🟢 | Online | {online}\n🟡 | Idle | {idle}\n🔴 | DND | {dnd}\n⚫ | Offline | {offline}",
         inline=True
     )
 
@@ -1007,6 +1007,9 @@ async def slash_serverinfo(interaction: discord.Interaction):
     embed.add_field(name="Emojis", value=len(guild.emojis), inline=True)
     embed.add_field(name="Boosts", value=f"Level {guild.premium_tier} ({guild.premium_subscription_count} boosts)",
                     inline=True)
+
+    # Verification Level
+    embed.add_field(name="Verification Level", value=str(guild.verification_level).title(), inline=True)
 
     # Server Features
     if guild.features:
