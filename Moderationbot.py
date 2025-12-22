@@ -850,18 +850,15 @@ async def slash_lockdown(interaction: discord.Interaction, message: str = None):
 
 @bot.tree.command(name="killswitch", description="Emergency bot shutdown (Owner Only)")
 async def slash_killswitch(interaction: discord.Interaction):
-    interaction.response.defer()
     # Check if user is the bot owner
     if interaction.user.id != 447812883158532106:
         await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
         return
 
-    await interaction.response.send_message("🔴 **EMERGENCY SHUTDOWN INITIATED**\nBot is shutting down...",)
-
+    await interaction.response.send_message("🔴 **EMERGENCY SHUTDOWN INITIATED**\nBot is shutting down...")
 
     # Close the bot
     await bot.close()
-
 
 @bot.tree.command(name="ping", description="Check the bot's latency")
 async def slash_ping(interaction: discord.Interaction):
