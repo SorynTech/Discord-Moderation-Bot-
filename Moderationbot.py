@@ -781,7 +781,7 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
             ephemeral=True
         )
 @bot.tree.command(name="purge", description="Mass Delete Messages")
-@commands.has.permissions(manage_messages=True)
+@app_commands.checks.has_permissions(manage_messages=True)
 @app_commands.describe(msgamount="How many Messages you want to delete")
 async def slash_purge_messages(interaction: discord.Interaction, msgamount: int):
     await interaction.response.defer()
@@ -790,8 +790,10 @@ async def slash_purge_messages(interaction: discord.Interaction, msgamount: int)
         return
     if msgamount <= 0:
         await interaction.followup.send("The message amount needs to be greater than 0!", ephemeral=True)
+        return
     if msgamount > 100:
         await interaction.followup.send("You cannot do over 100 messages at a time", ephemeral=True)
+        return
     try:
         deleted = await interaction.channel.purge(limit=msgamount)
         await interaction.followup.send(f"Successfully deleted {len(deleted)} messages!", ephemeral=True)
