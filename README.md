@@ -95,8 +95,8 @@
 
 - **Completed:** 23 commands
 - **In Progress:** 9 commands
-- **Not Started:** 30 commands
-- **Total Planned:** 62 commands
+- **Not Started:** 31 commands
+- **Total Planned:** 63 commands
 
 ---
 
