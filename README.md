@@ -80,7 +80,8 @@
 - [ ] `say` - Make the bot say something
 - [ ] `embed` - Create a custom embed message
 - [ ] `poll` - Create a poll with reactions
-- [ ] `giveaway` - Start a giveaway
+- [ ] `Role-Info`- Get Role Information
+- [ ] `Command-Info`- Get command Permissions and information 
 
 ### Advanced Features
 
