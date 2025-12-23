@@ -404,7 +404,7 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
 
 @bot.tree.command(name="dc", description="Disconnect a user from voice")
 @app_commands.describe(member="Member to disconnect")
-@app_commands.checks.has_permissions(move_members=True)
+@app_commands.checks.has_permissions(send_polls=True)
 async def slash_disconnect(interaction: discord.Interaction, member: discord.Member):
     # Check if bot has permission
     if not interaction.guild.me.guild_permissions.move_members:
