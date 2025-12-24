@@ -23,7 +23,6 @@
 - [x] `userinfo` - Get detailed information about a user
 - [x] `ping` - Check bot latency
 - [x] `killswitch` - Emergency bot shutdown (Owner Only)
-
 ---
 
 ## 🚧 Work In Progress
@@ -37,11 +36,8 @@
 - [ ] `clearwarns` - Clear all warnings for a user
 - [ ] `case` - View details of a specific moderation case
 - [ ] `reason` - Add/edit reason for a moderation action
-
+- [ ]
 ---
-
-## 📋 Not Started Yet
-
 ### Role Management Commands
 
 - [ ] `addrole` - Give a role to a user
@@ -50,6 +46,10 @@
 - [ ] `deleterole` - Delete a role
 - [ ] `roleinfo` - Display information about a role
 - [ ] `rolemembers` - List all members with a specific role
+
+---
+
+## 📋 Not Started Yet
 
 ### Message Management Commands
 
@@ -94,7 +94,7 @@
 ## 📊 Progress Statistics
 
 - **Completed:** 23 commands
-- **In Progress:** 9 commands
+- **In Progress:** 15 commands
 - **Not Started:** 31 commands
 - **Total Planned:** 63 commands
 
@@ -102,4 +102,4 @@
 
 ## 🔄 Last Updated
 
-December 22, 2025
+December 24, 2025
