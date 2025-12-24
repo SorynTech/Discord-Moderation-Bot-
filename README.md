@@ -36,7 +36,6 @@
 - [ ] `clearwarns` - Clear all warnings for a user
 - [ ] `case` - View details of a specific moderation case
 - [ ] `reason` - Add/edit reason for a moderation action
-- [ ]
 ---
 ### Role Management Commands
 
