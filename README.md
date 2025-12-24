@@ -37,12 +37,9 @@
 - [ ] `clearwarns` - Clear all warnings for a user
 - [ ] `case` - View details of a specific moderation case
 - [ ] `reason` - Add/edit reason for a moderation action
-
+- [ ]
 ---
-
-## 📋 Not Started Yet
-
-### Role Management Commands
+  ### Role Management Commands
 
 - [ ] `addrole` - Give a role to a user
 - [ ] `removerole` - Remove a role from a user
@@ -50,6 +47,10 @@
 - [ ] `deleterole` - Delete a role
 - [ ] `roleinfo` - Display information about a role
 - [ ] `rolemembers` - List all members with a specific role
+
+---
+
+## 📋 Not Started Yet
 
 ### Message Management Commands
 
