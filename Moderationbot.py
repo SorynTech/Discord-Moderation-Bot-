@@ -662,11 +662,11 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
     try:
         await member.edit(mute=True, reason=f"Server muted by {interaction.user}")
         await interaction.followup.send(
-            f"✅ Successfully server deafened {member.mention}!"
+            f"✅ Successfully server Muted {member.mention}!"
         )
     except discord.Forbidden:
         await interaction.followup.send(
-            "❌ I don't have permission to deafen this member!",
+            "❌ I don't have permission to Mute this member!",
             ephemeral=True
         )
     except discord.HTTPException as e:
@@ -759,7 +759,7 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
     # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send(
-            "❌ I cannot undeafen this member (their role is equal or higher than mine)!",
+            "❌ I cannot unmute this member (their role is equal or higher than mine)!",
             ephemeral=True
         )
         return
@@ -1021,8 +1021,8 @@ async def slash_serverinfo(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
-
-
+#===============WIP ROLE MANAGMENT================================================================================
+print("WIP")
 # error handling
 @slash_ban.error
 @slash_kick.error
