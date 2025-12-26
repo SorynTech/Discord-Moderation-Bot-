@@ -1,6 +1,7 @@
 # Discord Moderation Bot - Command Roadmap
 
 ## ✅ Completed Commands
+
 - [x] `unlock-server` - Unlock all channels after lockdown
 - [x] `nickname` - Change a member's nickname
 - [x] `resetnick` - Reset a member's nickname to their username
@@ -70,6 +71,7 @@
 - [ ] `unhide` - Unhide a channel
 
 ### Utility Commands
+
 - [ ] `uptime` - Show how long the bot has been running
 - [ ] `avatar` - Get user's avatar (alternative to userpicture)
 - [ ] `invite` - Generate bot invite link
