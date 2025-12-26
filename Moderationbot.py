@@ -1022,7 +1022,6 @@ async def slash_serverinfo(interaction: discord.Interaction):
 
 
 #===============WIP ROLE MANAGMENT================================================================================
-print("WIP")
 # error handling
 @slash_ban.error
 @slash_kick.error
