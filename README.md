@@ -23,12 +23,13 @@
 - [x] `userinfo` - Get detailed information about a user
 - [x] `ping` - Check bot latency
 - [x] `killswitch` - Emergency bot shutdown (Owner Only)
+- [x] `addrole` - Give a role to a user
+- [x] `role-count` - Show how many users have a specific role
+
 ---
 
 ## 🚧 Work In Progress
-
 - [ ] `membercount` - Display server member statistics
-- [ ] `rolecount` - Show number of members with each role
 - [ ] `botinfo` - Display bot statistics and information
 - [ ] `modnote` - Add a note about a user (visible only to mods)
 - [ ] `warn` - Issue a warning to a user
@@ -36,10 +37,11 @@
 - [ ] `clearwarns` - Clear all warnings for a user
 - [ ] `case` - View details of a specific moderation case
 - [ ] `reason` - Add/edit reason for a moderation action
----
-### Role Management Commands
 
-- [ ] `addrole` - Give a role to a user
+---
+
+### Role Management Commands
+- [x] `addrole` - Give a role to a user (COMPLETED)
 - [ ] `removerole` - Remove a role from a user
 - [ ] `createrole` - Create a new role with specified permissions
 - [ ] `deleterole` - Delete a role
@@ -51,7 +53,6 @@
 ## 📋 Not Started Yet
 
 ### Message Management Commands
-
 - [ ] `clear` - Delete messages from a specific user
 - [ ] `purgebots` - Delete only bot messages
 - [ ] `purgeembeds` - Delete messages containing embeds
@@ -61,7 +62,6 @@
 - [ ] `purgeuntil` - Delete messages until a specific message ID
 
 ### Channel Management Commands
-
 - [ ] `lock` - Lock a specific channel
 - [ ] `unlock` - Unlock a specific channel
 - [ ] `slowmode` - Set slowmode delay for a channel
@@ -79,11 +79,10 @@
 - [ ] `say` - Make the bot say something
 - [ ] `embed` - Create a custom embed message
 - [ ] `poll` - Create a poll with reactions
-- [ ] `Role-Info`- Get Role Information
-- [ ] `Command-Info`- Get command Permissions and information 
+- [ ] `Role-Info` - Get Role Information
+- [ ] `Command-Info` - Get command Permissions and information 
 
 ### Advanced Features
-
 - [ ] `setlogchannel` - Set a channel for mod logs
 - [ ] `togglelog` - Enable/disable specific log events
 - [ ] `automod` - Toggle automod features (anti-spam, anti-caps, etc.)
@@ -91,14 +90,12 @@
 ---
 
 ## 📊 Progress Statistics
-
-- **Completed:** 23 commands
-- **In Progress:** 15 commands
-- **Not Started:** 31 commands
+- **Completed:** 25 commands
+- **In Progress:** 8 commands
+- **Not Started:** 30 commands
 - **Total Planned:** 63 commands
 
 ---
 
 ## 🔄 Last Updated
-
-December 24, 2025
+December 26, 2025

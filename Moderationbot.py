@@ -7,11 +7,15 @@ import requests
 import random as r
 from aiohttp import web
 import logging
+
 # Track bot start time for uptime
 bot_start_time = None
 if bot_start_time is None:
     bot_start_time = datetime.datetime.now()
-#End Initalization
+
+# Track update status
+bot_updating = False
+# End Initalization
 
 
 # Set up logging to see rate limit info
@@ -69,12 +73,110 @@ else:
 
 
 async def health_check(request):
+    global bot_updating
+
     if bot_start_time is None:
         return web.Response(
             text="Bot is starting up, please wait...",
             content_type='text/plain',
             status=503
         )
+
+    # Check if bot is in update mode
+    if bot_updating:
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Discord Bot Status</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: linear-gradient(135deg, #f5af19 0%, #f12711 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 20px;
+                }
+                .container {
+                    background: white;
+                    border-radius: 20px;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    padding: 40px;
+                    max-width: 500px;
+                    width: 100%;
+                    text-align: center;
+                }
+                .status-icon {
+                    width: 80px;
+                    height: 80px;
+                    background: linear-gradient(135deg, #f5af19 0%, #f12711 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin: 0 auto 20px;
+                    animation: spin 2s linear infinite;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                .update-icon {
+                    font-size: 40px;
+                    color: white;
+                }
+                h1 {
+                    color: #333;
+                    margin-bottom: 10px;
+                    font-size: 28px;
+                }
+                .status {
+                    color: #ff6b35;
+                    font-weight: bold;
+                    font-size: 18px;
+                    margin-bottom: 30px;
+                }
+                .info-message {
+                    background: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                    padding: 15px;
+                    border-radius: 5px;
+                    color: #856404;
+                    margin-top: 20px;
+                }
+                @media (max-width: 480px) {
+                    .container {
+                        padding: 30px 20px;
+                    }
+                    h1 {
+                        font-size: 24px;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="status-icon">
+                    <span class="update-icon">⟳</span>
+                </div>
+                <h1>Bot is <span class="status">Updating</span></h1>
+                <p style="color: #666; margin-bottom: 20px;">Maintenance in progress</p>
+                <div class="info-message">
+                    ⚠️ The bot is currently being updated. Please check back in a few minutes.
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+    return web.Response(text=html, content_type='text/html', status=503)
 
     uptime = datetime.datetime.now() - bot_start_time
     hours, remainder = divmod(int(uptime.total_seconds()), 3600)
@@ -210,7 +312,6 @@ async def health_check(request):
     </html>
 """
     return web.Response(text=html, content_type='text/html')
-
 
 
 async def start_web_server():
@@ -446,8 +547,6 @@ async def slash_disconnect(interaction: discord.Interaction, member: discord.Mem
         )
 
 
-
-
 @bot.tree.command(name="userpicture", description="Get a User's Profile Picture")
 @app_commands.describe(member="The member to get picture of")
 @app_commands.checks.has_permissions(send_messages=True)
@@ -456,7 +555,6 @@ async def slash_userpicture(interaction: discord.Interaction, member: discord.Me
     await interaction.response.defer()
     picture = member.display_avatar.url
     await interaction.followup.send(picture)
-
 
 
 @bot.tree.command(name="userbanner", description="Get a user's nitro banner")
@@ -591,6 +689,7 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
 
     await interaction.followup.send(embed=embed)
 
+
 @bot.tree.command(name="sdeaf", description="Deafen a user")
 @app_commands.describe(member="The member to deafen")
 @app_commands.checks.has_permissions(send_polls=True)
@@ -641,7 +740,9 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
             f"❌ An error occurred: {e}",
             ephemeral=True
         )
-@bot.tree.command(name="smute",description="Mute a user")
+
+
+@bot.tree.command(name="smute", description="Mute a user")
 @app_commands.describe(member="The member to mute")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_servermute(interaction: discord.Interaction, member: discord.Member):
@@ -652,12 +753,21 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send("Member role is too high or my role is too low")
         return
-        # Check if member is already deafened
+    # Check if member is in a voice channel
+    if member.voice is None or member.voice.channel is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not in a voice channel!",
+            ephemeral=True
+        )
+        return
+   
+    
+    # Check if member is already muted
     if member.voice.mute:
         await interaction.followup.send(
             f"❌ {member.mention} is already server muted!",
             ephemeral=True
-            )
+        )
         return
     try:
         await member.edit(mute=True, reason=f"Server muted by {interaction.user}")
@@ -780,6 +890,8 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
             f"❌ An error occurred: {e}",
             ephemeral=True
         )
+
+
 @bot.tree.command(name="purge", description="Mass Delete Messages")
 @app_commands.checks.has_permissions(manage_messages=True)
 @app_commands.describe(msgamount="How many Messages you want to delete")
@@ -860,6 +972,34 @@ async def slash_killswitch(interaction: discord.Interaction):
     # Close the bot
     await bot.close()
 
+
+@bot.tree.command(name="updatemode", description="Toggle update mode for the bot status page (Owner Only)")
+async def slash_updatemode(interaction: discord.Interaction):
+    global bot_updating
+
+    # Check if user is the bot owner
+    if interaction.user.id != 447812883158532106:
+        await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
+        return
+
+    # Toggle update mode
+    bot_updating = not bot_updating
+
+    if bot_updating:
+        await interaction.response.send_message(
+            "🔄 **UPDATE MODE ENABLED**\n"
+            "The status page now displays 'Bot is Updating'.\n"
+            "Use this command again to disable update mode.",
+            ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            "✅ **UPDATE MODE DISABLED**\n"
+            "The status page now shows normal bot status.",
+            ephemeral=True
+        )
+
+
 @bot.tree.command(name="ping", description="Check the bot's latency")
 async def slash_ping(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
@@ -913,6 +1053,7 @@ async def slash_unlockserver(interaction: discord.Interaction):
 
     except Exception as e:
         await interaction.followup.send(f"❌ An error occurred during unlock: {e}", ephemeral=True)
+
 
 @bot.tree.command(name="nickname", description="Change a users nickname")
 @app_commands.checks.has_permissions(manage_nicknames=True)
@@ -1021,7 +1162,72 @@ async def slash_serverinfo(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+
 #===============WIP ROLE MANAGMENT================================================================================
+@bot.tree.command(name="addrole", description="Add a role to a user")
+async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
+    # Check if the bot has permission to manage roles
+    if not interaction.guild.me.guild_permissions.manage_roles:
+        await interaction.response.send_message("I don't have permission to manage roles!", ephemeral=True)
+        return
+
+    # Check if the command user has permission to manage roles
+    if not interaction.user.guild_permissions.manage_roles:
+        await interaction.response.send_message("You don't have permission to manage roles!", ephemeral=True)
+        return
+
+    # Check if the bot's highest role is higher than the role to add
+    if interaction.guild.me.top_role <= role:
+        await interaction.response.send_message(
+            f"I cannot add {role.mention} because it's higher than or equal to my highest role!", ephemeral=True)
+        return
+
+    # Check if the user's highest role is higher than the role to add
+    if interaction.user.top_role <= role and interaction.user != interaction.guild.owner:
+        await interaction.response.send_message(
+            f"You cannot add {role.mention} because it's higher than or equal to your highest role!", ephemeral=True)
+        return
+
+    # Check if the member already has the role
+    if role in member.roles:
+        await interaction.response.send_message(f"{member.mention} already has the {role.mention} role!",
+                                                ephemeral=True)
+        return
+
+    # Add the role
+    try:
+        await member.add_roles(role, reason=f"Role added by {interaction.user}")
+        await interaction.response.send_message(f"Successfully added {role.mention} to {member.mention}!")
+    except discord.Forbidden:
+        await interaction.response.send_message("Failed to add role due to permission issues!", ephemeral=True)
+    except discord.HTTPException as e:
+        await interaction.response.send_message(f"An error occurred: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="role-count", description="Show how many users have a role")
+async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
+    # Count members who have this role
+    member_count = len(role.members)
+
+    # Create an embed
+    embed = discord.Embed(
+        title="📊 Role Statistics",
+        color=role.color
+    )
+
+    embed.add_field(name="Role", value=role.mention, inline=True)
+    embed.add_field(name="Member Count", value=f"**{member_count}**", inline=True)
+    embed.add_field(name="Role ID", value=f"`{role.id}`", inline=False)
+
+    # Add a footer with timestamp
+    embed.set_footer(text=f"Requested by {interaction.user.name}")
+    embed.timestamp = interaction.created_at
+
+    await interaction.response.send_message(embed=embed)
+
+
+
+
 # error handling
 @slash_ban.error
 @slash_kick.error
@@ -1078,7 +1284,6 @@ async def prefix_ban(ctx, member: discord.Member, *, reason=None):
         return
     await member.ban(reason=reason)
     await ctx.send(f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}")
-
 
 
 if __name__ == "__main__":
