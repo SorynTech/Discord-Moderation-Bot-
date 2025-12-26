@@ -860,7 +860,7 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
     # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send(
-            "❌ I cannot unmute this member (their role is equal or higher than mine)!",
+            "❌ I cannot undeafen this member (their role is equal or higher than mine)!",
             ephemeral=True
         )
         return
@@ -1153,6 +1153,9 @@ async def slash_serverinfo(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
+<<<<<<< HEAD
+#===============WIP ROLE MANAGMENT================================================================================
+=======
 # ===============WIP ROLE MANAGMENT================================================================================
 @bot.tree.command(name="addrole", description="Add a role to a user")
 async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
@@ -1216,7 +1219,8 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
     await interaction.response.send_message(embed=embed)
 
 
-#
+
+
 # error handling
 @slash_ban.error
 @slash_kick.error
