@@ -753,7 +753,15 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send("Member role is too high or my role is too low")
         return
-        # Check if member is already deafened
+    # Check if member is in a voice channel
+  if member.voice is None or member.voice.channel is None:
+      await interaction.followup.send(
+          f"❌ {member.mention} is not in a voice channel!",
+          ephemeral=True
+       )
+      return   
+    
+    # Check if member is already muted
     if member.voice.mute:
         await interaction.followup.send(
             f"❌ {member.mention} is already server muted!",
@@ -1153,10 +1161,8 @@ async def slash_serverinfo(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
-<<<<<<< HEAD
+
 #===============WIP ROLE MANAGMENT================================================================================
-=======
-# ===============WIP ROLE MANAGMENT================================================================================
 @bot.tree.command(name="addrole", description="Add a role to a user")
 async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     # Check if the bot has permission to manage roles
