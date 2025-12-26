@@ -754,12 +754,13 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
         await interaction.followup.send("Member role is too high or my role is too low")
         return
     # Check if member is in a voice channel
-  if member.voice is None or member.voice.channel is None:
-      await interaction.followup.send(
-          f"❌ {member.mention} is not in a voice channel!",
-          ephemeral=True
-       )
-      return   
+    if member.voice is None or member.voice.channel is None:
+        await interaction.followup.send(
+            f"❌ {member.mention} is not in a voice channel!",
+            ephemeral=True
+        )
+        return
+   
     
     # Check if member is already muted
     if member.voice.mute:
