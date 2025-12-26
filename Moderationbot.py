@@ -759,7 +759,7 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
     # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send(
-            "❌ I cannot unmute this member (their role is equal or higher than mine)!",
+            "❌ I cannot undeafen this member (their role is equal or higher than mine)!",
             ephemeral=True
         )
         return
