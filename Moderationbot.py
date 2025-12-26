@@ -176,8 +176,9 @@ async def health_check(request):
         </body>
         </html>
         """
-    return web.Response(text=html, content_type='text/html', status=503)
+        return web.Response(text=html, content_type='text/html', status=503)  # MOVED THIS LINE HERE
 
+    # Normal status (bot is running)
     uptime = datetime.datetime.now() - bot_start_time
     hours, remainder = divmod(int(uptime.total_seconds()), 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -308,9 +309,9 @@ async def health_check(request):
                 </div>
             </div>
         </div>
-</body>
+    </body>
     </html>
-"""
+    """
     return web.Response(text=html, content_type='text/html')
 
 
