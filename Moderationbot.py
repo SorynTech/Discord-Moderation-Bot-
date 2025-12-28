@@ -370,7 +370,7 @@ async def health_check(request):
             <div class="seaweed"></div>
             <div class="container">
                 <div class="status-icon">
-                    <span class="shark-icon">🦈💤</span>
+                    <span class="shark-icon">🦈</span>
                 </div>
                 <h1>Shark is <span class="status">Sleeping</span></h1>
                 <p style="color: #7eb8d6; margin-bottom: 20px;">Resting in the deep sea</p>
