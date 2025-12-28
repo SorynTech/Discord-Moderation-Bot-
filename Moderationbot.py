@@ -15,6 +15,10 @@ if bot_start_time is None:
 
 # Track update status
 bot_updating = False
+# Track emergency shutdown status
+bot_emergency_shutdown = False
+# Track owner sleep status
+bot_owner_sleeping = False
 # End Initalization
 
 
@@ -73,7 +77,7 @@ else:
 
 
 async def health_check(request):
-    global bot_updating
+    global bot_updating, bot_emergency_shutdown, bot_owner_sleeping
 
     if bot_start_time is None:
         return web.Response(
@@ -81,6 +85,303 @@ async def health_check(request):
             content_type='text/plain',
             status=503
         )
+
+    # Check if bot is in emergency shutdown mode
+    if bot_emergency_shutdown:
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Discord Bot Status</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: linear-gradient(180deg, #001220 0%, #003d5c 50%, #001a2e 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 20px;
+                    position: relative;
+                    overflow: hidden;
+                }
+                body::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: 
+                        radial-gradient(ellipse at 20% 30%, rgba(0, 150, 255, 0.1) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 70%, rgba(0, 100, 180, 0.1) 0%, transparent 50%);
+                    animation: waterMovement 8s ease-in-out infinite;
+                }
+                @keyframes waterMovement {
+                    0%, 100% { opacity: 0.3; }
+                    50% { opacity: 0.6; }
+                }
+                .bubbles {
+                    position: absolute;
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
+                    pointer-events: none;
+                }
+                .bubble {
+                    position: absolute;
+                    bottom: -100px;
+                    width: 15px;
+                    height: 15px;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 50%;
+                    animation: rise 8s infinite ease-in;
+                }
+                .bubble:nth-child(1) { left: 10%; animation-delay: 0s; width: 10px; height: 10px; }
+                .bubble:nth-child(2) { left: 30%; animation-delay: 2s; width: 20px; height: 20px; }
+                .bubble:nth-child(3) { left: 50%; animation-delay: 4s; width: 15px; height: 15px; }
+                .bubble:nth-child(4) { left: 70%; animation-delay: 1s; width: 12px; height: 12px; }
+                .bubble:nth-child(5) { left: 90%; animation-delay: 3s; width: 18px; height: 18px; }
+                @keyframes rise {
+                    to { bottom: 110%; opacity: 0; }
+                }
+                .container {
+                    background: rgba(0, 30, 50, 0.9);
+                    border-radius: 20px;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(0, 150, 255, 0.1);
+                    padding: 40px;
+                    max-width: 500px;
+                    width: 100%;
+                    text-align: center;
+                    position: relative;
+                    z-index: 10;
+                    border: 2px solid rgba(0, 150, 255, 0.2);
+                }
+                .status-icon {
+                    width: 100px;
+                    height: 100px;
+                    background: linear-gradient(135deg, #1a5490 0%, #0d2a45 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin: 0 auto 20px;
+                    border: 3px solid rgba(255, 0, 0, 0.5);
+                    position: relative;
+                    animation: pulse 2s infinite;
+                }
+                @keyframes pulse {
+                    0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); }
+                    50% { box-shadow: 0 0 40px rgba(255, 0, 0, 0.8); }
+                }
+                .shark-icon {
+                    font-size: 50px;
+                }
+                h1 {
+                    color: #e0f7ff;
+                    margin-bottom: 10px;
+                    font-size: 28px;
+                    text-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+                }
+                .status {
+                    color: #ff4444;
+                    font-weight: bold;
+                    font-size: 18px;
+                    margin-bottom: 30px;
+                    text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+                }
+                .info-message {
+                    background: rgba(255, 68, 68, 0.1);
+                    border-left: 4px solid #ff4444;
+                    padding: 15px;
+                    border-radius: 5px;
+                    color: #ffaaaa;
+                    margin-top: 20px;
+                }
+                @media (max-width: 480px) {
+                    .container {
+                        padding: 30px 20px;
+                    }
+                    h1 {
+                        font-size: 24px;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="bubbles">
+                <div class="bubble"></div>
+                <div class="bubble"></div>
+                <div class="bubble"></div>
+                <div class="bubble"></div>
+                <div class="bubble"></div>
+            </div>
+            <div class="container">
+                <div class="status-icon">
+                    <span class="shark-icon">🦈</span>
+                </div>
+                <h1>Bot is <span class="status">Offline</span></h1>
+                <p style="color: #7eb8d6; margin-bottom: 20px;">Shark in the deep waters</p>
+                <div class="info-message">
+                    🔴 The bot has gone into the deep. Emergency shutdown activated. Please check back later.
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return web.Response(text=html, content_type='text/html', status=503)
+
+    # Check if owner is sleeping
+    if bot_owner_sleeping:
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Discord Bot Status</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: linear-gradient(180deg, #001a33 0%, #002d4d 50%, #001a33 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 20px;
+                    position: relative;
+                    overflow: hidden;
+                }
+                body::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: 
+                        radial-gradient(ellipse at 30% 40%, rgba(50, 100, 150, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 60%, rgba(30, 80, 120, 0.15) 0%, transparent 50%);
+                    animation: deepWater 10s ease-in-out infinite;
+                }
+                @keyframes deepWater {
+                    0%, 100% { opacity: 0.4; transform: translateY(0); }
+                    50% { opacity: 0.7; transform: translateY(-10px); }
+                }
+                .seaweed {
+                    position: absolute;
+                    bottom: 0;
+                    width: 30px;
+                    height: 150px;
+                    background: linear-gradient(to top, #1a4d2e, #2d6a4f);
+                    border-radius: 50% 50% 0 0;
+                    opacity: 0.3;
+                    animation: sway 4s ease-in-out infinite;
+                }
+                .seaweed:nth-child(1) { left: 10%; animation-delay: 0s; }
+                .seaweed:nth-child(2) { left: 25%; height: 120px; animation-delay: 1s; }
+                .seaweed:nth-child(3) { right: 20%; height: 180px; animation-delay: 0.5s; }
+                .seaweed:nth-child(4) { right: 5%; animation-delay: 1.5s; }
+                @keyframes sway {
+                    0%, 100% { transform: rotate(-5deg); }
+                    50% { transform: rotate(5deg); }
+                }
+                .container {
+                    background: rgba(0, 40, 70, 0.85);
+                    border-radius: 20px;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(50, 150, 200, 0.1);
+                    padding: 40px;
+                    max-width: 500px;
+                    width: 100%;
+                    text-align: center;
+                    position: relative;
+                    z-index: 10;
+                    border: 2px solid rgba(100, 180, 220, 0.2);
+                }
+                .status-icon {
+                    width: 100px;
+                    height: 100px;
+                    background: linear-gradient(135deg, #2d5f8d 0%, #1a3a52 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin: 0 auto 20px;
+                    border: 3px solid rgba(100, 180, 220, 0.4);
+                    animation: float 3s ease-in-out infinite;
+                }
+                @keyframes float {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                }
+                .shark-icon {
+                    font-size: 50px;
+                    animation: swim 2s ease-in-out infinite;
+                }
+                @keyframes swim {
+                    0%, 100% { transform: translateX(0); }
+                    50% { transform: translateX(5px); }
+                }
+                h1 {
+                    color: #cce7f5;
+                    margin-bottom: 10px;
+                    font-size: 28px;
+                    text-shadow: 0 0 15px rgba(100, 180, 220, 0.5);
+                }
+                .status {
+                    color: #5dade2;
+                    font-weight: bold;
+                    font-size: 18px;
+                    margin-bottom: 30px;
+                    text-shadow: 0 0 10px rgba(93, 173, 226, 0.5);
+                }
+                .info-message {
+                    background: rgba(93, 173, 226, 0.15);
+                    border-left: 4px solid #5dade2;
+                    padding: 15px;
+                    border-radius: 5px;
+                    color: #a8d8ea;
+                    margin-top: 20px;
+                }
+                @media (max-width: 480px) {
+                    .container {
+                        padding: 30px 20px;
+                    }
+                    h1 {
+                        font-size: 24px;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="seaweed"></div>
+            <div class="seaweed"></div>
+            <div class="seaweed"></div>
+            <div class="seaweed"></div>
+            <div class="container">
+                <div class="status-icon">
+                    <span class="shark-icon">🦈💤</span>
+                </div>
+                <h1>Shark is <span class="status">Sleeping</span></h1>
+                <p style="color: #7eb8d6; margin-bottom: 20px;">Resting in the deep sea</p>
+                <div class="info-message">
+                    😴 SorynTech is sleeping and will not respond to any PRs. The shark is resting in its underwater cave.
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return web.Response(text=html, content_type='text/html', status=200)
 
     # Check if bot is in update mode
     if bot_updating:
@@ -98,58 +399,91 @@ async def health_check(request):
                 }
                 body {
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: linear-gradient(135deg, #f5af19 0%, #f12711 100%);
+                    background: linear-gradient(180deg, #001f3f 0%, #004d7a 50%, #001f3f 100%);
                     min-height: 100vh;
                     display: flex;
                     justify-content: center;
                     align-items: center;
                     padding: 20px;
+                    position: relative;
+                    overflow: hidden;
+                }
+                body::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: 
+                        radial-gradient(ellipse at 25% 35%, rgba(255, 140, 0, 0.1) 0%, transparent 50%),
+                        radial-gradient(ellipse at 75% 65%, rgba(255, 100, 0, 0.1) 0%, transparent 50%);
+                    animation: maintenanceGlow 6s ease-in-out infinite;
+                }
+                @keyframes maintenanceGlow {
+                    0%, 100% { opacity: 0.4; }
+                    50% { opacity: 0.8; }
+                }
+                .shark-swim {
+                    position: absolute;
+                    font-size: 60px;
+                    animation: sharkCrossing 12s linear infinite;
+                    opacity: 0.3;
+                }
+                @keyframes sharkCrossing {
+                    0% { left: -100px; }
+                    100% { left: 110%; }
                 }
                 .container {
-                    background: white;
+                    background: rgba(0, 45, 80, 0.9);
                     border-radius: 20px;
-                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(255, 140, 0, 0.1);
                     padding: 40px;
                     max-width: 500px;
                     width: 100%;
                     text-align: center;
+                    position: relative;
+                    z-index: 10;
+                    border: 2px solid rgba(255, 140, 0, 0.3);
                 }
                 .status-icon {
-                    width: 80px;
-                    height: 80px;
-                    background: linear-gradient(135deg, #f5af19 0%, #f12711 100%);
+                    width: 100px;
+                    height: 100px;
+                    background: linear-gradient(135deg, #ff8c00 0%, #cc6600 100%);
                     border-radius: 50%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
                     margin: 0 auto 20px;
-                    animation: spin 2s linear infinite;
+                    animation: spin 3s linear infinite;
+                    border: 3px solid rgba(255, 140, 0, 0.5);
                 }
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(360deg); }
                 }
                 .update-icon {
-                    font-size: 40px;
-                    color: white;
+                    font-size: 50px;
                 }
                 h1 {
-                    color: #333;
+                    color: #e0f7ff;
                     margin-bottom: 10px;
                     font-size: 28px;
+                    text-shadow: 0 0 10px rgba(255, 140, 0, 0.5);
                 }
                 .status {
-                    color: #ff6b35;
+                    color: #ff9933;
                     font-weight: bold;
                     font-size: 18px;
                     margin-bottom: 30px;
+                    text-shadow: 0 0 10px rgba(255, 153, 51, 0.5);
                 }
                 .info-message {
-                    background: #fff3cd;
-                    border-left: 4px solid #ffc107;
+                    background: rgba(255, 140, 0, 0.15);
+                    border-left: 4px solid #ff8c00;
                     padding: 15px;
                     border-radius: 5px;
-                    color: #856404;
+                    color: #ffcc99;
                     margin-top: 20px;
                 }
                 @media (max-width: 480px) {
@@ -163,14 +497,16 @@ async def health_check(request):
             </style>
         </head>
         <body>
+            <div class="shark-swim" style="top: 20%;">🦈</div>
+            <div class="shark-swim" style="top: 60%; animation-delay: 6s;">🦈</div>
             <div class="container">
                 <div class="status-icon">
-                    <span class="update-icon">⟳</span>
+                    <span class="update-icon">⚙️</span>
                 </div>
-                <h1>Bot is <span class="status">Updating</span></h1>
-                <p style="color: #666; margin-bottom: 20px;">Maintenance in progress</p>
+                <h1>Shark is <span class="status">Updating</span></h1>
+                <p style="color: #7eb8d6; margin-bottom: 20px;">Maintenance dive in progress</p>
                 <div class="info-message">
-                    ⚠️ The bot is currently being updated. Please check back in a few minutes.
+                    ⚠️ The shark is performing maintenance in the deep. Check back in a few minutes.
                 </div>
             </div>
         </body>
@@ -196,57 +532,95 @@ async def health_check(request):
             }}
             body {{
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(180deg, #003366 0%, #006699 50%, #003366 100%);
                 min-height: 100vh;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 padding: 20px;
+                position: relative;
+                overflow: hidden;
+            }}
+            body::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: 
+                    radial-gradient(ellipse at 30% 30%, rgba(0, 200, 255, 0.15) 0%, transparent 50%),
+                    radial-gradient(ellipse at 70% 70%, rgba(0, 150, 200, 0.15) 0%, transparent 50%);
+                animation: oceanWaves 10s ease-in-out infinite;
+            }}
+            @keyframes oceanWaves {{
+                0%, 100% {{ opacity: 0.5; }}
+                50% {{ opacity: 0.8; }}
+            }}
+            .fish {{
+                position: absolute;
+                font-size: 25px;
+                opacity: 0.4;
+                animation: fishSwim 15s linear infinite;
+            }}
+            .fish:nth-child(1) {{ top: 20%; animation-delay: 0s; }}
+            .fish:nth-child(2) {{ top: 50%; animation-delay: 5s; }}
+            .fish:nth-child(3) {{ top: 80%; animation-delay: 10s; }}
+            @keyframes fishSwim {{
+                0% {{ left: -100px; transform: scaleX(1); }}
+                48% {{ transform: scaleX(1); }}
+                52% {{ transform: scaleX(-1); }}
+                100% {{ left: 110%; transform: scaleX(-1); }}
             }}
             .container {{
-                background: white;
+                background: rgba(0, 60, 100, 0.9);
                 border-radius: 20px;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(0, 200, 255, 0.1);
                 padding: 40px;
                 max-width: 500px;
                 width: 100%;
                 text-align: center;
+                position: relative;
+                z-index: 10;
+                border: 2px solid rgba(0, 200, 255, 0.3);
             }}
             .status-icon {{
-                width: 80px;
-                height: 80px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                width: 100px;
+                height: 100px;
+                background: linear-gradient(135deg, #00cc88 0%, #008855 100%);
                 border-radius: 50%;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 margin: 0 auto 20px;
                 animation: pulse 2s infinite;
+                border: 3px solid rgba(0, 204, 136, 0.5);
             }}
             @keyframes pulse {{
                 0%, 100% {{
                     transform: scale(1);
-                    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+                    box-shadow: 0 0 20px rgba(0, 204, 136, 0.5);
                 }}
                 50% {{
                     transform: scale(1.05);
-                    box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+                    box-shadow: 0 0 40px rgba(0, 204, 136, 0.8);
                 }}
             }}
-            .checkmark {{
-                font-size: 40px;
-                color: white;
+            .shark-icon {{
+                font-size: 50px;
             }}
             h1 {{
-                color: #333;
+                color: #e0f7ff;
                 margin-bottom: 10px;
                 font-size: 28px;
+                text-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
             }}
             .status {{
-                color: #4CAF50;
+                color: #00ff88;
                 font-weight: bold;
                 font-size: 18px;
                 margin-bottom: 30px;
+                text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
             }}
             .info-grid {{
                 display: grid;
@@ -254,24 +628,26 @@ async def health_check(request):
                 margin-top: 30px;
             }}
             .info-item {{
-                background: #f5f5f5;
+                background: rgba(0, 100, 150, 0.3);
                 padding: 15px;
                 border-radius: 10px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                border: 1px solid rgba(0, 200, 255, 0.2);
             }}
             .info-label {{
-                color: #666;
+                color: #7eb8d6;
                 font-weight: 500;
             }}
             .info-value {{
-                color: #333;
+                color: #e0f7ff;
                 font-weight: bold;
             }}
             .bot-name {{
-                color: #667eea;
+                color: #00ddff;
                 font-weight: bold;
+                text-shadow: 0 0 5px rgba(0, 221, 255, 0.5);
             }}
             @media (max-width: 480px) {{
                 .container {{
@@ -284,27 +660,30 @@ async def health_check(request):
         </style>
     </head>
     <body>
+        <div class="fish">🐠</div>
+        <div class="fish">🐟</div>
+        <div class="fish">🐡</div>
         <div class="container">
             <div class="status-icon">
-                <span class="checkmark">✓</span>
+                <span class="shark-icon">🦈</span>
             </div>
-            <h1>Bot is <span class="status">Online</span></h1>
-            <p style="color: #666; margin-bottom: 20px;">All systems operational</p>
+            <h1>Shark is <span class="status">Hunting</span></h1>
+            <p style="color: #7eb8d6; margin-bottom: 20px;">All systems operational - cruising the deep</p>
             <div class="info-grid">
                 <div class="info-item">
-                    <span class="info-label">Bot Name</span>
+                    <span class="info-label">🦈 Shark Name</span>
                     <span class="info-value bot-name">{bot.user.name if bot.user else "Loading..."}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Uptime</span>
+                    <span class="info-label">⏱️ Swim Time</span>
                     <span class="info-value">{hours}h {minutes}m {seconds}s</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Servers</span>
+                    <span class="info-label">🏝️ Ocean Territories</span>
                     <span class="info-value">{len(bot.guilds)}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Latency</span>
+                    <span class="info-label">📡 Sonar Ping</span>
                     <span class="info-value">{round(bot.latency * 1000)}ms</span>
                 </div>
             </div>
@@ -350,6 +729,26 @@ async def on_ready():
         traceback.print_exc()
 
 
+# Command check to block commands during emergency shutdown
+async def check_emergency_shutdown(interaction: discord.Interaction) -> bool:
+    global bot_emergency_shutdown
+
+    # Allow owner commands regardless of shutdown status
+    if interaction.user.id == 447812883158532106:
+        return True
+
+    # Block all commands during emergency shutdown (but NOT during owner sleep)
+    if bot_emergency_shutdown:
+        await interaction.response.send_message(
+            "🔴 **Bot is currently offline due to emergency shutdown.**",
+            ephemeral=True
+        )
+        return False
+
+    # Owner sleep mode does NOT block commands - only changes status page
+    return True
+
+
 # Add event handler for rate limits
 @bot.event
 async def on_command_error(ctx, error):
@@ -364,6 +763,9 @@ async def on_command_error(ctx, error):
 )
 @app_commands.checks.has_permissions(kick_members=True)
 async def slash_kick(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.kick_members:
@@ -390,6 +792,9 @@ async def slash_kick(interaction: discord.Interaction, member: discord.Member, r
 )
 @app_commands.checks.has_permissions(ban_members=True)
 async def slash_ban(interaction: discord.Interaction, member: discord.Member, reason: str = None):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.ban_members:
@@ -415,6 +820,9 @@ async def slash_ban(interaction: discord.Interaction, member: discord.Member, re
 )
 @app_commands.checks.has_permissions(ban_members=True)
 async def slash_unban(interaction: discord.Interaction, user_id: str):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.ban_members:
@@ -441,6 +849,9 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
 )
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_mute(interaction: discord.Interaction, member: discord.Member, duration: int = 60, reason: str = None):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.moderate_members:
@@ -465,6 +876,9 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
 @app_commands.describe(member="The member to unmute")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_unmute(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.moderate_members:
@@ -508,6 +922,9 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
 @app_commands.describe(member="Member to disconnect")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_disconnect(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     # Check if bot has permission
     if not interaction.guild.me.guild_permissions.move_members:
         await interaction.response.send_message("❌ I don't have permission to move members!", ephemeral=True)
@@ -553,6 +970,9 @@ async def slash_disconnect(interaction: discord.Interaction, member: discord.Mem
 @app_commands.checks.has_permissions(send_messages=True)
 @app_commands.checks.has_permissions(embed_links=True)
 async def slash_userpicture(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
     picture = member.display_avatar.url
     await interaction.followup.send(picture)
@@ -563,6 +983,9 @@ async def slash_userpicture(interaction: discord.Interaction, member: discord.Me
 @app_commands.checks.has_permissions(send_messages=True)
 @app_commands.checks.has_permissions(embed_links=True)
 async def slash_userbanner(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
     user = await bot.fetch_user(member.id)
 
@@ -577,6 +1000,9 @@ async def slash_userbanner(interaction: discord.Interaction, member: discord.Mem
 @app_commands.describe(member="The member to get info about (leave empty for yourself)")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_userinfo(interaction: discord.Interaction, member: discord.Member = None):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     member = member or interaction.user
@@ -695,6 +1121,9 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
 @app_commands.describe(member="The member to deafen")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
     # Check if bot has permission
     if not interaction.guild.me.guild_permissions.deafen_members:
@@ -747,6 +1176,9 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
 @app_commands.describe(member="The member to mute")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_servermute(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
     if not interaction.guild.me.guild_permissions.mute_members:
         await interaction.followup.send("I dont have permissions :angry_face:")
@@ -761,8 +1193,7 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
             ephemeral=True
         )
         return
-   
-    
+
     # Check if member is already muted
     if member.voice.mute:
         await interaction.followup.send(
@@ -791,6 +1222,9 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
 @app_commands.describe(member="The member to unmute")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_unmute_voice(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     # Check if bot has permission
@@ -844,6 +1278,9 @@ async def slash_unmute_voice(interaction: discord.Interaction, member: discord.M
 @app_commands.describe(member="The member to undeafen")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.Member):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     # Check if bot has permission
@@ -897,6 +1334,9 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
 @app_commands.checks.has_permissions(manage_messages=True)
 @app_commands.describe(msgamount="How many Messages you want to delete")
 async def slash_purge_messages(interaction: discord.Interaction, msgamount: int):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
     if not interaction.guild.me.guild_permissions.manage_messages:
         await interaction.followup.send("I do not have Permissions!", ephemeral=True)
@@ -920,6 +1360,9 @@ async def slash_purge_messages(interaction: discord.Interaction, msgamount: int)
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.describe(message="(Optional) Lockdown Message")
 async def slash_lockdown(interaction: discord.Interaction, message: str = None):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.manage_channels:
@@ -963,15 +1406,80 @@ async def slash_lockdown(interaction: discord.Interaction, message: str = None):
 
 @bot.tree.command(name="killswitch", description="Emergency bot shutdown (Owner Only)")
 async def slash_killswitch(interaction: discord.Interaction):
+    global bot_emergency_shutdown
+
     # Check if user is the bot owner
     if interaction.user.id != 447812883158532106:
         await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
         return
 
-    await interaction.response.send_message("🔴 **EMERGENCY SHUTDOWN INITIATED**\nBot is shutting down...")
+    # Toggle emergency shutdown mode
+    bot_emergency_shutdown = not bot_emergency_shutdown
 
-    # Close the bot
-    await bot.close()
+    if bot_emergency_shutdown:
+        await interaction.response.send_message(
+            "🔴 **EMERGENCY SHUTDOWN ACTIVATED**\n"
+            "All commands are now disabled except /restart-bot.\n"
+            "The status page now shows the bot as offline.",
+            ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            "✅ **EMERGENCY SHUTDOWN DEACTIVATED**\n"
+            "Bot is now accepting commands normally.",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="restart-bot", description="Restart the bot from emergency shutdown (Owner Only)")
+async def slash_restart_bot(interaction: discord.Interaction):
+    global bot_emergency_shutdown
+
+    # Check if user is the bot owner
+    if interaction.user.id != 447812883158532106:
+        await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
+        return
+
+    if not bot_emergency_shutdown:
+        await interaction.response.send_message(
+            "ℹ️ Bot is not in emergency shutdown mode.",
+            ephemeral=True
+        )
+        return
+
+    bot_emergency_shutdown = False
+    await interaction.response.send_message(
+        "✅ **BOT RESTARTED**\n"
+        "Emergency shutdown mode disabled. Bot is now accepting all commands.",
+        ephemeral=True
+    )
+
+
+@bot.tree.command(name="owner-sleep", description="Toggle owner sleep status page (Owner Only)")
+async def slash_owner_sleep(interaction: discord.Interaction):
+    global bot_owner_sleeping
+
+    # Check if user is the bot owner
+    if interaction.user.id != 447812883158532106:
+        await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
+        return
+
+    # Toggle owner sleep mode
+    bot_owner_sleeping = not bot_owner_sleeping
+
+    if bot_owner_sleeping:
+        await interaction.response.send_message(
+            "😴 **OWNER SLEEP STATUS ENABLED**\n"
+            "The status page now shows 'SorynTech is sleeping and will not respond to any PRs'.\n"
+            "⚠️ Note: Bot commands remain fully functional.",
+            ephemeral=True
+        )
+    else:
+        await interaction.response.send_message(
+            "✅ **OWNER SLEEP STATUS DISABLED**\n"
+            "The status page now shows normal bot status.",
+            ephemeral=True
+        )
 
 
 @bot.tree.command(name="updatemode", description="Toggle update mode for the bot status page (Owner Only)")
@@ -1003,6 +1511,9 @@ async def slash_updatemode(interaction: discord.Interaction):
 
 @bot.tree.command(name="ping", description="Check the bot's latency")
 async def slash_ping(interaction: discord.Interaction):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     latency = round(bot.latency * 1000)
 
     embed = discord.Embed(
@@ -1017,6 +1528,9 @@ async def slash_ping(interaction: discord.Interaction):
 @bot.tree.command(name="unlockserver", description="Unlock the server")
 @app_commands.checks.has_permissions(administrator=True)
 async def slash_unlockserver(interaction: discord.Interaction):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     if not interaction.guild.me.guild_permissions.manage_channels:
@@ -1064,6 +1578,9 @@ async def slash_unlockserver(interaction: discord.Interaction):
 )
 @app_commands.checks.has_permissions(manage_nicknames=True)
 async def slash_nickname(interaction: discord.Interaction, member: discord.Member, nickname: str = None):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
     if not interaction.guild.me.guild_permissions.manage_nicknames:
         await interaction.followup.send("❌ I don't have permission to manage nicknames!", ephemeral=True)
@@ -1092,6 +1609,9 @@ async def slash_nickname(interaction: discord.Interaction, member: discord.Membe
 
 @bot.tree.command(name="serverinfo", description="Display server information")
 async def slash_serverinfo(interaction: discord.Interaction):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     await interaction.response.defer()
 
     guild = interaction.guild
@@ -1163,10 +1683,12 @@ async def slash_serverinfo(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 
-
-#===============WIP ROLE MANAGMENT================================================================================
+# ===============WIP ROLE MANAGMENT================================================================================
 @bot.tree.command(name="addrole", description="Add a role to a user")
 async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     # Check if the bot has permission to manage roles
     if not interaction.guild.me.guild_permissions.manage_roles:
         await interaction.response.send_message("I don't have permission to manage roles!", ephemeral=True)
@@ -1207,6 +1729,9 @@ async def slash_addrole(interaction: discord.Interaction, member: discord.Member
 
 @bot.tree.command(name="role-count", description="Show how many users have a role")
 async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
+    if not await check_emergency_shutdown(interaction):
+        return
+
     # Count members who have this role
     member_count = len(role.members)
 
@@ -1227,8 +1752,6 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
     await interaction.response.send_message(embed=embed)
 
 
-
-
 # error handling
 @slash_ban.error
 @slash_kick.error
@@ -1247,6 +1770,10 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
 @slash_unlockserver.error
 @slash_nickname.error
 @slash_serverinfo.error
+@slash_ping.error
+@slash_addrole.error
+@slash_rolecount.error
+@slash_unmute.error
 async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
         try:
@@ -1259,6 +1786,44 @@ async def permission_error(interaction: discord.Interaction, error: app_commands
                 "❌ You don't have permission to use this command!",
                 ephemeral=True
             )
+    elif isinstance(error, app_commands.BotMissingPermissions):
+        try:
+            await interaction.response.send_message(
+                "❌ I don't have the required permissions to execute this command!",
+                ephemeral=True
+            )
+        except:
+            await interaction.followup.send(
+                "❌ I don't have the required permissions to execute this command!",
+                ephemeral=True
+            )
+    elif isinstance(error, app_commands.CommandOnCooldown):
+        try:
+            await interaction.response.send_message(
+                f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.",
+                ephemeral=True
+            )
+        except:
+            await interaction.followup.send(
+                f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.",
+                ephemeral=True
+            )
+    else:
+        # Log unexpected errors
+        print(f"Unexpected error in command: {error}")
+        try:
+            await interaction.response.send_message(
+                "❌ An unexpected error occurred while executing this command.",
+                ephemeral=True
+            )
+        except:
+            try:
+                await interaction.followup.send(
+                    "❌ An unexpected error occurred while executing this command.",
+                    ephemeral=True
+                )
+            except:
+                pass
 
 
 @bot.command(name='kick')
