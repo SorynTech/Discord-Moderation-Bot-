@@ -22,15 +22,7 @@ bot_owner_sleeping = False
 # End Initalization
 
 
-# Set up logging to see rate limit info
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
 
-# Create handler
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-logger.addHandler(handler)
 
 intents = discord.Intents.default()
 intents.message_content = True
