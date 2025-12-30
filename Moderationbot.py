@@ -7,6 +7,7 @@ import requests
 import random as r
 from aiohttp import web
 import logging
+import asyncio
 
 # Track bot start time for uptime
 bot_start_time = None
@@ -19,9 +20,9 @@ bot_updating = False
 bot_emergency_shutdown = False
 # Track owner sleep status
 bot_owner_sleeping = False
+# Track if commands are synced to prevent multiple syncs
+commands_synced = False
 # End Initalization
-
-
 
 
 intents = discord.Intents.default()
@@ -601,7 +602,7 @@ async def health_check(request):
         </body>
         </html>
         """
-        return web.Response(text=html, content_type='text/html', status=503)  # MOVED THIS LINE HERE
+        return web.Response(text=html, content_type='text/html', status=503)
 
     # Normal status (bot is running)
     uptime = datetime.datetime.now() - bot_start_time
@@ -818,25 +819,45 @@ async def start_web_server():
 
 @bot.event
 async def on_ready():
-    global bot_start_time
+    global bot_start_time, commands_synced
     bot_start_time = datetime.datetime.now()
     print(f'{bot.user} has connected to Discord!')
     bot.loop.create_task(start_web_server())
 
-    try:
-        print("Attempting to sync commands...")
-        synced = await bot.tree.sync()
-        print(f"✅ Successfully synced {len(synced)} command(s)")
-    except discord.Forbidden as e:
-        print(f"❌ Failed to sync commands (insufficient permissions): {e}")
-    except discord.HTTPException as e:
-        print(f"❌ Failed to sync commands (HTTP error): {e}")
-        print(f"Status: {e.status}")
-        print(f"Response: {e.text}")
-    except Exception as e:
-        print(f"❌ Failed to sync commands (unexpected error): {e}")
-        import traceback
-        traceback.print_exc()
+    # FIXED: Only sync commands once to prevent rate limiting
+    if not commands_synced:
+        try:
+            print("Attempting to sync commands...")
+            synced = await bot.tree.sync()
+            commands_synced = True
+            print(f"✅ Successfully synced {len(synced)} command(s)")
+        except discord.HTTPException as e:
+            if e.status == 429:  # Rate limit
+                print(f"⚠️ Rate limited when syncing commands. Will retry automatically.")
+                retry_after = e.response.headers.get('Retry-After', 60)
+                print(f"Retry after: {retry_after} seconds")
+                # Don't crash - let Discord.py handle the retry
+            else:
+                print(f"❌ Failed to sync commands (HTTP error): {e}")
+                print(f"Status: {e.status}")
+                print(f"Response: {e.text}")
+        except Exception as e:
+            print(f"❌ Failed to sync commands (unexpected error): {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print("Commands already synced, skipping sync")
+
+
+# CRITICAL FIX: Add on_message handler to prevent bot loops
+@bot.event
+async def on_message(message):
+    # Ignore all bot messages to prevent loops
+    if message.author.bot:
+        return
+
+    # Process commands
+    await bot.process_commands(message)
 
 
 # Command check to block commands during emergency shutdown
@@ -859,11 +880,15 @@ async def check_emergency_shutdown(interaction: discord.Interaction) -> bool:
     return True
 
 
-# Add event handler for rate limits
+# CRITICAL: Add rate limit handler
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
-        print(f"⏰ Command on cooldown: {error}")
+        await ctx.send(f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.")
+    elif isinstance(error, discord.HTTPException):
+        if error.status == 429:
+            print(f"⚠️ Rate limited! Response: {error.text}")
+            await ctx.send("⚠️ Bot is being rate limited. Please wait a moment.")
 
 
 @bot.tree.command(name="kick", description="Kick a member from the server")
@@ -877,6 +902,8 @@ async def slash_kick(interaction: discord.Interaction, member: discord.Member, r
         return
 
     await interaction.response.defer()
+    # Add delay to prevent rate limiting
+    await asyncio.sleep(0.5)
 
     if not interaction.guild.me.guild_permissions.kick_members:
         await interaction.followup.send("❌ I don't have permission to kick members!", ephemeral=True)
@@ -906,6 +933,7 @@ async def slash_ban(interaction: discord.Interaction, member: discord.Member, re
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
     if not interaction.guild.me.guild_permissions.ban_members:
         await interaction.followup.send("❌ I don't have permission to ban members!", ephemeral=True)
@@ -934,6 +962,7 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
     if not interaction.guild.me.guild_permissions.ban_members:
         await interaction.followup.send("❌ I don't have permission to unban members!", ephemeral=True)
@@ -963,6 +992,7 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
     if not interaction.guild.me.guild_permissions.moderate_members:
         await interaction.followup.send("❌ I don't have permission to timeout members!", ephemeral=True)
@@ -990,6 +1020,7 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
     if not interaction.guild.me.guild_permissions.moderate_members:
         await interaction.followup.send("❌ I don't have permission!", ephemeral=True)
@@ -1002,7 +1033,6 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
         )
         return
 
-    # Check if member is currently muted
     if member.timed_out_until is None:
         await interaction.followup.send(
             f"❌ {member.mention} is not currently muted!",
@@ -1010,7 +1040,6 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
         )
         return
 
-    # Unmute the member by removing the timeout
     try:
         await member.timeout(None, reason=f"Unmuted by {interaction.user}")
         await interaction.followup.send(
@@ -1035,12 +1064,10 @@ async def slash_disconnect(interaction: discord.Interaction, member: discord.Mem
     if not await check_emergency_shutdown(interaction):
         return
 
-    # Check if bot has permission
     if not interaction.guild.me.guild_permissions.move_members:
         await interaction.response.send_message("❌ I don't have permission to move members!", ephemeral=True)
         return
 
-    # Check if member is in a voice channel
     if member.voice is None or member.voice.channel is None:
         await interaction.response.send_message(
             f"❌ {member.mention} is not in a voice channel!",
@@ -1048,7 +1075,6 @@ async def slash_disconnect(interaction: discord.Interaction, member: discord.Mem
         )
         return
 
-    # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.response.send_message(
             "❌ I cannot disconnect this member (their role is equal or higher than mine)!",
@@ -1056,9 +1082,9 @@ async def slash_disconnect(interaction: discord.Interaction, member: discord.Mem
         )
         return
 
-    # Disconnect the member
     try:
-        await interaction.response.defer()  # Only defer right before the action
+        await interaction.response.defer()
+        await asyncio.sleep(0.5)
         await member.move_to(None, reason=f"Disconnected by {interaction.user}")
         await interaction.followup.send(
             f"✅ Successfully disconnected {member.mention}!"
@@ -1084,6 +1110,7 @@ async def slash_userpicture(interaction: discord.Interaction, member: discord.Me
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.3)
     picture = member.display_avatar.url
     await interaction.followup.send(picture)
 
@@ -1097,6 +1124,7 @@ async def slash_userbanner(interaction: discord.Interaction, member: discord.Mem
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.3)
     user = await bot.fetch_user(member.id)
 
     if user.banner:
@@ -1114,6 +1142,7 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
     member = member or interaction.user
 
@@ -1123,14 +1152,12 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
     )
     embed.set_thumbnail(url=member.display_avatar.url)
 
-    # Basic user information
     embed.add_field(name="Username", value=member.name, inline=True)
     embed.add_field(name="Nickname", value=member.nick or "None", inline=True)
     embed.add_field(name="ID", value=member.id, inline=True)
     embed.add_field(name="Joined Server", value=member.joined_at.strftime("%Y-%m-%d %H:%M UTC"), inline=True)
     embed.add_field(name="Account Created", value=member.created_at.strftime("%Y-%m-%d %H:%M UTC"), inline=True)
 
-    # Current status
     status_info = []
     if member.timed_out_until:
         status_info.append(f"⏱️ Timed out until: {member.timed_out_until.strftime('%Y-%m-%d %H:%M UTC')}")
@@ -1143,27 +1170,20 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
     if status_info:
         embed.add_field(name="Current Status", value="\n".join(status_info), inline=False)
 
-    # Roles
     roles = [role.mention for role in member.roles[1:]]
     if roles:
         embed.add_field(name="Roles", value=", ".join(roles), inline=False)
 
-    # Moderation history
     mod_history = []
     try:
-        # Check if bot has permission to view audit logs
         if not interaction.guild.me.guild_permissions.view_audit_log:
             embed.add_field(name="📋 Moderation History", value="⚠️ Bot lacks permission to view audit logs",
                             inline=False)
         else:
-            # Fetch audit logs without any target filter
-            entries_checked = 0
             async for entry in interaction.guild.audit_logs(limit=200):
-                # Check if this entry targets our member
                 if not entry.target:
                     continue
 
-                # Compare IDs to filter for our specific member
                 target_id = None
                 if hasattr(entry.target, 'id'):
                     target_id = entry.target.id
@@ -1173,9 +1193,6 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
                 if target_id != member.id:
                     continue
 
-                entries_checked += 1
-
-                # Process different action types
                 if entry.action == discord.AuditLogAction.kick:
                     timestamp = entry.created_at.strftime("%Y-%m-%d %H:%M")
                     moderator = entry.user.mention if entry.user else "Unknown"
@@ -1195,7 +1212,6 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
                     mod_history.append(f"✅ **Unban** - {timestamp}\nBy: {moderator}\nReason: {reason}")
 
                 elif entry.action == discord.AuditLogAction.member_update:
-                    # Check for timeout changes
                     try:
                         before_timeout = getattr(entry.before, 'timed_out_until', None)
                         after_timeout = getattr(entry.after, 'timed_out_until', None)
@@ -1206,10 +1222,9 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
                             reason = entry.reason or "No reason provided"
                             mod_history.append(f"⏱️ **Timeout** - {timestamp}\nBy: {moderator}\nReason: {reason}")
                     except AttributeError:
-                        pass  # Skip if attributes don't exist
+                        pass
 
             if mod_history:
-                # Limit to last 5 actions to avoid embed size limits
                 history_text = "\n\n".join(mod_history[:5])
                 if len(mod_history) > 5:
                     history_text += f"\n\n*...and {len(mod_history) - 5} more action(s)*"
@@ -1222,7 +1237,7 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
                         inline=False)
     except Exception as e:
         embed.add_field(name="📋 Moderation History", value=f"⚠️ Error: {type(e).__name__}", inline=False)
-        print(f"Audit log error: {type(e).__name__}: {str(e)}")  # Log to console for debugging
+        print(f"Audit log error: {type(e).__name__}: {str(e)}")
 
     await interaction.followup.send(embed=embed)
 
@@ -1235,12 +1250,12 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
         return
 
     await interaction.response.defer()
-    # Check if bot has permission
+    await asyncio.sleep(0.5)
+
     if not interaction.guild.me.guild_permissions.deafen_members:
         await interaction.followup.send("❌ I don't have permission to deafen members!", ephemeral=True)
         return
 
-    # Check if member is in a voice channel
     if member.voice is None or member.voice.channel is None:
         await interaction.followup.send(
             f"❌ {member.mention} is not in a voice channel!",
@@ -1248,7 +1263,6 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
         )
         return
 
-    # Check if member is already deafened
     if member.voice.deaf:
         await interaction.followup.send(
             f"❌ {member.mention} is already server deafened!",
@@ -1256,7 +1270,6 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
         )
         return
 
-    # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send(
             "❌ I cannot deafen this member (their role is equal or higher than mine)!",
@@ -1264,7 +1277,6 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
         )
         return
 
-    # Deafen the member
     try:
         await member.edit(deafen=True, reason=f"Server deafened by {interaction.user}")
         await interaction.followup.send(
@@ -1290,13 +1302,15 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
     if not interaction.guild.me.guild_permissions.mute_members:
         await interaction.followup.send("I dont have permissions :angry_face:")
         return
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send("Member role is too high or my role is too low")
         return
-    # Check if member is in a voice channel
+
     if member.voice is None or member.voice.channel is None:
         await interaction.followup.send(
             f"❌ {member.mention} is not in a voice channel!",
@@ -1304,7 +1318,6 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
         )
         return
 
-    # Check if member is already muted
     if member.voice.mute:
         await interaction.followup.send(
             f"❌ {member.mention} is already server muted!",
@@ -1336,13 +1349,12 @@ async def slash_unmute_voice(interaction: discord.Interaction, member: discord.M
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
-    # Check if bot has permission
     if not interaction.guild.me.guild_permissions.mute_members:
         await interaction.followup.send("❌ I don't have permission to mute/unmute members!", ephemeral=True)
         return
 
-    # Check if member is in a voice channel
     if member.voice is None or member.voice.channel is None:
         await interaction.followup.send(
             f"❌ {member.mention} is not in a voice channel!",
@@ -1350,7 +1362,6 @@ async def slash_unmute_voice(interaction: discord.Interaction, member: discord.M
         )
         return
 
-    # Check if member is actually muted
     if not member.voice.mute:
         await interaction.followup.send(
             f"❌ {member.mention} is not server muted!",
@@ -1358,7 +1369,6 @@ async def slash_unmute_voice(interaction: discord.Interaction, member: discord.M
         )
         return
 
-    # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send(
             "❌ I cannot unmute this member (their role is equal or higher than mine)!",
@@ -1366,7 +1376,6 @@ async def slash_unmute_voice(interaction: discord.Interaction, member: discord.M
         )
         return
 
-    # Unmute the member
     try:
         await member.edit(mute=False, reason=f"Server unmuted by {interaction.user}")
         await interaction.followup.send(
@@ -1392,13 +1401,12 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
 
-    # Check if bot has permission
     if not interaction.guild.me.guild_permissions.deafen_members:
         await interaction.followup.send("❌ I don't have permission to deafen/undeafen members!", ephemeral=True)
         return
 
-    # Check if member is in a voice channel
     if member.voice is None or member.voice.channel is None:
         await interaction.followup.send(
             f"❌ {member.mention} is not in a voice channel!",
@@ -1406,7 +1414,6 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
         )
         return
 
-    # Check if member is actually deafened
     if not member.voice.deaf:
         await interaction.followup.send(
             f"❌ {member.mention} is not server deafened!",
@@ -1414,7 +1421,6 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
         )
         return
 
-    # Check role hierarchy
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.followup.send(
             "❌ I cannot undeafen this member (their role is equal or higher than mine)!",
@@ -1422,7 +1428,6 @@ async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.M
         )
         return
 
-    # Undeafen the member
     try:
         await member.edit(deafen=False, reason=f"Server undeafened by {interaction.user}")
         await interaction.followup.send(
@@ -1448,6 +1453,8 @@ async def slash_purge_messages(interaction: discord.Interaction, msgamount: int)
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
     if not interaction.guild.me.guild_permissions.manage_messages:
         await interaction.followup.send("I do not have Permissions!", ephemeral=True)
         return
@@ -1486,22 +1493,20 @@ async def slash_lockdown(interaction: discord.Interaction, message: str = None):
         locked_count = 0
         failed_channels = []
 
-        # Loop through all text channels
         for channel in interaction.guild.text_channels:
             try:
-                # Deny send messages for @everyone role
                 await channel.set_permissions(
                     interaction.guild.default_role,
                     send_messages=False,
                     reason=f"Server lockdown by {interaction.user}"
                 )
                 locked_count += 1
+                await asyncio.sleep(0.3)  # Delay between channel locks
             except discord.Forbidden:
                 failed_channels.append(channel.name)
             except discord.HTTPException:
                 failed_channels.append(channel.name)
 
-        # Send response
         response = f"🔒 **Server Locked Down**\n✅ Locked {locked_count} channels"
         if failed_channels:
             response += f"\n❌ Failed to lock: {', '.join(failed_channels)}"
@@ -1518,16 +1523,13 @@ async def slash_lockdown(interaction: discord.Interaction, message: str = None):
 async def slash_killswitch(interaction: discord.Interaction):
     global bot_emergency_shutdown
 
-    # Check if user is the bot owner
     if interaction.user.id != 447812883158532106:
         await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
         return
 
-    # Toggle emergency shutdown mode
     bot_emergency_shutdown = not bot_emergency_shutdown
 
     if bot_emergency_shutdown:
-        # Set bot status to invisible
         await bot.change_presence(status=discord.Status.invisible)
         await interaction.response.send_message(
             "🔴 **EMERGENCY SHUTDOWN ACTIVATED**\n"
@@ -1537,7 +1539,6 @@ async def slash_killswitch(interaction: discord.Interaction):
             ephemeral=True
         )
     else:
-        # Set bot status back to online
         await bot.change_presence(status=discord.Status.online)
         await interaction.response.send_message(
             "✅ **EMERGENCY SHUTDOWN DEACTIVATED**\n"
@@ -1551,7 +1552,6 @@ async def slash_killswitch(interaction: discord.Interaction):
 async def slash_restart_bot(interaction: discord.Interaction):
     global bot_emergency_shutdown
 
-    # Check if user is the bot owner
     if interaction.user.id != 447812883158532106:
         await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
         return
@@ -1564,7 +1564,6 @@ async def slash_restart_bot(interaction: discord.Interaction):
         return
 
     bot_emergency_shutdown = False
-    # Set bot status back to online
     await bot.change_presence(status=discord.Status.online)
     await interaction.response.send_message(
         "✅ **BOT RESTARTED**\n"
@@ -1578,12 +1577,10 @@ async def slash_restart_bot(interaction: discord.Interaction):
 async def slash_owner_sleep(interaction: discord.Interaction):
     global bot_owner_sleeping
 
-    # Check if user is the bot owner
     if interaction.user.id != 447812883158532106:
         await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
         return
 
-    # Toggle owner sleep mode
     bot_owner_sleeping = not bot_owner_sleeping
 
     if bot_owner_sleeping:
@@ -1605,16 +1602,13 @@ async def slash_owner_sleep(interaction: discord.Interaction):
 async def slash_updatemode(interaction: discord.Interaction):
     global bot_updating
 
-    # Check if user is the bot owner
     if interaction.user.id != 447812883158532106:
         await interaction.response.send_message("❌ You are not authorized to use this command!", ephemeral=True)
         return
 
-    # Toggle update mode
     bot_updating = not bot_updating
 
     if bot_updating:
-        # Set bot status to idle
         await bot.change_presence(status=discord.Status.idle)
         await interaction.response.send_message(
             "🔄 **UPDATE MODE ENABLED**\n"
@@ -1624,7 +1618,6 @@ async def slash_updatemode(interaction: discord.Interaction):
             ephemeral=True
         )
     else:
-        # Set bot status back to online
         await bot.change_presence(status=discord.Status.online)
         await interaction.response.send_message(
             "✅ **UPDATE MODE DISABLED**\n"
@@ -1669,22 +1662,20 @@ async def slash_unlockserver(interaction: discord.Interaction):
         unlocked_count = 0
         failed_channels = []
 
-        # Loop through all text channels
         for channel in interaction.guild.text_channels:
             try:
-                # Re-enable send messages for @everyone role
                 await channel.set_permissions(
                     interaction.guild.default_role,
-                    send_messages=None,  # None resets to default/removes override
+                    send_messages=None,
                     reason=f"Server unlocked by {interaction.user}"
                 )
                 unlocked_count += 1
+                await asyncio.sleep(0.3)  # Delay between channel unlocks
             except discord.Forbidden:
                 failed_channels.append(channel.name)
             except discord.HTTPException:
                 failed_channels.append(channel.name)
 
-        # Send response
         response = f"🔓 **Server Unlocked**\n✅ Unlocked {unlocked_count} channels"
         if failed_channels:
             response += f"\n❌ Failed to unlock: {', '.join(failed_channels)}"
@@ -1707,6 +1698,8 @@ async def slash_nickname(interaction: discord.Interaction, member: discord.Membe
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
     if not interaction.guild.me.guild_permissions.manage_nicknames:
         await interaction.followup.send("❌ I don't have permission to manage nicknames!", ephemeral=True)
         return
@@ -1738,16 +1731,15 @@ async def slash_serverinfo(interaction: discord.Interaction):
         return
 
     await interaction.response.defer()
+    await asyncio.sleep(0.3)
 
     guild = interaction.guild
 
-    # Count members by status
     online = sum(1 for m in guild.members if m.status == discord.Status.online)
     idle = sum(1 for m in guild.members if m.status == discord.Status.idle)
     dnd = sum(1 for m in guild.members if m.status == discord.Status.dnd)
     offline = sum(1 for m in guild.members if m.status == discord.Status.offline)
 
-    # Count bots
     bots = sum(1 for m in guild.members if m.bot)
     humans = len(guild.members) - bots
 
@@ -1760,12 +1752,10 @@ async def slash_serverinfo(interaction: discord.Interaction):
     if guild.icon:
         embed.set_thumbnail(url=guild.icon.url)
 
-    # Basic Info
     embed.add_field(name="Server ID", value=guild.id, inline=True)
     embed.add_field(name="Owner", value=guild.owner.mention if guild.owner else "Unknown", inline=True)
     embed.add_field(name="Created On", value=guild.created_at.strftime("%Y-%m-%d"), inline=True)
 
-    # Member Stats
     embed.add_field(
         name=f"Members ({len(guild.members)})",
         value=f"👤 Humans: {humans}\n🤖 Bots: {bots}",
@@ -1778,7 +1768,6 @@ async def slash_serverinfo(interaction: discord.Interaction):
         inline=True
     )
 
-    # Channel Stats
     text_channels = len(guild.text_channels)
     voice_channels = len(guild.voice_channels)
     categories = len(guild.categories)
@@ -1789,16 +1778,13 @@ async def slash_serverinfo(interaction: discord.Interaction):
         inline=True
     )
 
-    # Role and Emoji Info
     embed.add_field(name="Roles", value=len(guild.roles), inline=True)
     embed.add_field(name="Emojis", value=len(guild.emojis), inline=True)
     embed.add_field(name="Boosts", value=f"Level {guild.premium_tier} ({guild.premium_subscription_count} boosts)",
                     inline=True)
 
-    # Verification Level
     embed.add_field(name="Verification Level", value=str(guild.verification_level).title(), inline=True)
 
-    # Server Features
     if guild.features:
         features = ", ".join([f.replace("_", " ").title() for f in guild.features[:5]])
         if len(guild.features) > 5:
@@ -1807,239 +1793,35 @@ async def slash_serverinfo(interaction: discord.Interaction):
 
     await interaction.followup.send(embed=embed)
 
-@bot.tree.command(name="modnote", description="Add a note about a user (visible only to mods)")
-@app_commands.describe(
-    user="The user to add a note about",
-    note="The note content"
-)
-@app_commands.checks.has_permissions(moderate_members=True)
-async def slash_modnote(interaction: discord.Interaction, user: discord.User, note: str):
-    if not await check_emergency_shutdown(interaction):
-        return
 
-    await interaction.response.defer(ephemeral=True)
-
-    # Store the note in your database here
-    # Example: await db.add_modnote(interaction.guild.id, user.id, interaction.user.id, note)
-
-    await interaction.followup.send(
-        f"✅ Moderation note added for {user.mention}:\n```{note}```",
-        ephemeral=True
-    )
-
-
-@bot.tree.command(name="warn", description="Issue a warning to a user")
-@app_commands.describe(
-    member="The member to warn",
-    reason="Reason for the warning"
-)
-@app_commands.checks.has_permissions(moderate_members=True)
-async def slash_warn(interaction: discord.Interaction, member: discord.Member, reason: str):
-    if not await check_emergency_shutdown(interaction):
-        return
-
-    await interaction.response.defer()
-
-    # Store the warning in your database here
-    # Example: case_id = await db.add_warning(interaction.guild.id, member.id, interaction.user.id, reason)
-
-    try:
-        await member.send(
-            f"⚠️ You have been warned in **{interaction.guild.name}**\n"
-            f"**Reason:** {reason}\n"
-            f"**Moderator:** {interaction.user.mention}"
-        )
-        dm_status = "User has been notified via DM."
-    except discord.Forbidden:
-        dm_status = "Could not DM the user."
-
-    await interaction.followup.send(
-        f"✅ {member.mention} has been warned.\n"
-        f"**Reason:** {reason}\n"
-        f"{dm_status}"
-    )
-
-
-@bot.tree.command(name="warnings", description="View warnings for a specific user")
-@app_commands.describe(
-    user="The user to view warnings for"
-)
-@app_commands.checks.has_permissions(moderate_members=True)
-async def slash_warnings(interaction: discord.Interaction, user: discord.User):
-    if not await check_emergency_shutdown(interaction):
-        return
-
-    await interaction.response.defer(ephemeral=True)
-
-    # Fetch warnings from your database here
-    # Example: warnings = await db.get_warnings(interaction.guild.id, user.id)
-
-    # Mock data for demonstration
-    warnings = []  # Replace with actual database query
-
-    if not warnings:
-        await interaction.followup.send(
-            f"ℹ️ {user.mention} has no warnings.",
-            ephemeral=True
-        )
-        return
-
-    embed = discord.Embed(
-        title=f"Warnings for {user.name}",
-        description=f"Total warnings: {len(warnings)}",
-        color=discord.Color.orange()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-
-    for idx, warning in enumerate(warnings[:10], 1):  # Show last 10 warnings
-        # Example warning structure: {case_id, reason, moderator_id, timestamp}
-        embed.add_field(
-            name=f"Case #{warning['case_id']} - {warning['timestamp']}",
-            value=f"**Reason:** {warning['reason']}\n**Moderator:** <@{warning['moderator_id']}>",
-            inline=False
-        )
-
-    await interaction.followup.send(embed=embed, ephemeral=True)
-
-
-@bot.tree.command(name="clearwarns", description="Clear all warnings for a user")
-@app_commands.describe(
-    user="The user to clear warnings for"
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def slash_clearwarns(interaction: discord.Interaction, user: discord.User):
-    if not await check_emergency_shutdown(interaction):
-        return
-
-    await interaction.response.defer(ephemeral=True)
-
-    # Clear warnings from your database here
-    # Example: count = await db.clear_warnings(interaction.guild.id, user.id)
-
-    count = 0  # Replace with actual count from database
-
-    if count == 0:
-        await interaction.followup.send(
-            f"ℹ️ {user.mention} has no warnings to clear.",
-            ephemeral=True
-        )
-        return
-
-    await interaction.followup.send(
-        f"✅ Cleared {count} warning(s) for {user.mention}",
-        ephemeral=True
-    )
-
-
-@bot.tree.command(name="case", description="View details of a specific moderation case")
-@app_commands.describe(
-    case_id="The case ID to view"
-)
-@app_commands.checks.has_permissions(moderate_members=True)
-async def slash_case(interaction: discord.Interaction, case_id: int):
-    if not await check_emergency_shutdown(interaction):
-        return
-
-    await interaction.response.defer(ephemeral=True)
-
-    # Fetch case from your database here
-    # Example: case = await db.get_case(interaction.guild.id, case_id)
-
-    case = None  # Replace with actual database query
-
-    if not case:
-        await interaction.followup.send(
-            f"❌ Case #{case_id} not found.",
-            ephemeral=True
-        )
-        return
-
-    # Example case structure: {case_id, type, user_id, moderator_id, reason, timestamp}
-    embed = discord.Embed(
-        title=f"Case #{case['case_id']}",
-        color=discord.Color.blue(),
-        timestamp=case['timestamp']
-    )
-    embed.add_field(name="Type", value=case['type'].capitalize(), inline=True)
-    embed.add_field(name="User", value=f"<@{case['user_id']}>", inline=True)
-    embed.add_field(name="Moderator", value=f"<@{case['moderator_id']}>", inline=True)
-    embed.add_field(name="Reason", value=case['reason'] or "No reason provided", inline=False)
-
-    await interaction.followup.send(embed=embed, ephemeral=True)
-
-
-@bot.tree.command(name="reason", description="Add/edit reason for a moderation action")
-@app_commands.describe(
-    case_id="The case ID to update",
-    reason="The new reason"
-)
-@app_commands.checks.has_permissions(moderate_members=True)
-async def slash_reason(interaction: discord.Interaction, case_id: int, reason: str):
-    if not await check_emergency_shutdown(interaction):
-        return
-
-    await interaction.response.defer(ephemeral=True)
-
-    # Update reason in your database here
-    # Example: success = await db.update_case_reason(interaction.guild.id, case_id, reason)
-
-    success = True  # Replace with actual database operation
-
-    if not success:
-        await interaction.followup.send(
-            f"❌ Case #{case_id} not found or could not be updated.",
-            ephemeral=True
-        )
-        return
-
-    await interaction.followup.send(
-        f"✅ Updated reason for case #{case_id}:\n```{reason}```",
-        ephemeral=True
-    )
-
-#=====================================================WIP (INFO)=====================================================
-
-#@bot.tree.command(name="member-count",description="Display server member statistics")
-#async def slash_member_count(interaction: discord.Interaction):
-    #print("save indent")
-#@bot.tree.command(name="bot-info", description="Display bot statistics and information")
-#async def slash_bot_info(interaction: discord.Interaction):
-    #print("Save indent")
-# ===============WIP ROLE MANAGMENT================================================================================
 @bot.tree.command(name="addrole", description="Add a role to a user")
 async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     if not await check_emergency_shutdown(interaction):
         return
 
-    # Check if the bot has permission to manage roles
     if not interaction.guild.me.guild_permissions.manage_roles:
         await interaction.response.send_message("I don't have permission to manage roles!", ephemeral=True)
         return
 
-    # Check if the command user has permission to manage roles
     if not interaction.user.guild_permissions.manage_roles:
         await interaction.response.send_message("You don't have permission to manage roles!", ephemeral=True)
         return
 
-    # Check if the bot's highest role is higher than the role to add
     if interaction.guild.me.top_role <= role:
         await interaction.response.send_message(
             f"I cannot add {role.mention} because it's higher than or equal to my highest role!", ephemeral=True)
         return
 
-    # Check if the user's highest role is higher than the role to add
     if interaction.user.top_role <= role and interaction.user != interaction.guild.owner:
         await interaction.response.send_message(
             f"You cannot add {role.mention} because it's higher than or equal to your highest role!", ephemeral=True)
         return
 
-    # Check if the member already has the role
     if role in member.roles:
         await interaction.response.send_message(f"{member.mention} already has the {role.mention} role!",
                                                 ephemeral=True)
         return
 
-    # Add the role
     try:
         await member.add_roles(role, reason=f"Role added by {interaction.user}")
         await interaction.response.send_message(f"Successfully added {role.mention} to {member.mention}!")
@@ -2054,10 +1836,8 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
     if not await check_emergency_shutdown(interaction):
         return
 
-    # Count members who have this role
     member_count = len(role.members)
 
-    # Create an embed
     embed = discord.Embed(
         title="📊 Role Statistics",
         color=role.color
@@ -2067,14 +1847,13 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
     embed.add_field(name="Member Count", value=f"**{member_count}**", inline=True)
     embed.add_field(name="Role ID", value=f"`{role.id}`", inline=False)
 
-    # Add a footer with timestamp
     embed.set_footer(text=f"Requested by {interaction.user.name}")
     embed.timestamp = interaction.created_at
 
     await interaction.response.send_message(embed=embed)
 
 
-# error handling
+# Error handling
 @slash_ban.error
 @slash_kick.error
 @slash_mute.error
@@ -2131,7 +1910,6 @@ async def permission_error(interaction: discord.Interaction, error: app_commands
                 ephemeral=True
             )
     else:
-        # Log unexpected errors
         print(f"Unexpected error in command: {error}")
         try:
             await interaction.response.send_message(
@@ -2151,12 +1929,17 @@ async def permission_error(interaction: discord.Interaction, error: app_commands
 @bot.command(name='kick')
 @commands.has_permissions(kick_members=True)
 async def prefix_kick(ctx, member: discord.Member, *, reason=None):
+    # Check if message author is a bot
+    if ctx.author.bot:
+        return
+
     if not ctx.guild.me.guild_permissions.kick_members:
         await ctx.send("❌ I don't have permission to kick members!")
         return
     if member.top_role >= ctx.guild.me.top_role:
         await ctx.send("❌ I cannot kick this member (their role is equal or higher than mine)!")
         return
+    await asyncio.sleep(0.5)
     await member.kick(reason=reason)
     await ctx.send(f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}")
 
@@ -2164,12 +1947,17 @@ async def prefix_kick(ctx, member: discord.Member, *, reason=None):
 @bot.command(name='ban')
 @commands.has_permissions(ban_members=True)
 async def prefix_ban(ctx, member: discord.Member, *, reason=None):
+    # Check if message author is a bot
+    if ctx.author.bot:
+        return
+
     if not ctx.guild.me.guild_permissions.ban_members:
         await ctx.send("❌ I don't have permission to ban members!")
         return
     if member.top_role >= ctx.guild.me.top_role:
         await ctx.send("❌ I cannot ban this member (their role is equal or higher than mine)!")
         return
+    await asyncio.sleep(0.5)
     await member.ban(reason=reason)
     await ctx.send(f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}")
 
@@ -2185,7 +1973,7 @@ if __name__ == "__main__":
     else:
         print("Starting bot...")
         try:
-            bot.run(TOKEN, log_handler=None)  # Use our custom logging
+            bot.run(TOKEN, log_handler=None)
         except Exception as e:
             print(f"BOT CRASHED: {e}")
             import traceback
