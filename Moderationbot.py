@@ -115,9 +115,6 @@ async def setup_hook():
 async def health_check(request):
     global bot_updating, bot_emergency_shutdown, bot_owner_sleeping
     # Add this line at the top
-    import socket
-    render_ip = socket.gethostbyname(socket.gethostname())
-    print(f"🌐 Render IP: {render_ip}")
 
     if bot_start_time is None:
         return web.Response(
