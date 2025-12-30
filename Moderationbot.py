@@ -48,7 +48,7 @@ import logging
 # Track bot start time for uptime
 bot_start_time = None
 if bot_start_time is None:
-    bot_start_time = datetime.datetime.now()
+    bot_start_time = datetime.now()
 
 # Track update status
 bot_updating = False
