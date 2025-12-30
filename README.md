@@ -83,7 +83,7 @@ Token exists: True
 Token length: 72
 Token first 10 chars: 1234567890...
 Token last 10 chars: ...0987654321
-```
+
 
 Bot: SharkBot (ID: 1234567890123456789)
 ==================
