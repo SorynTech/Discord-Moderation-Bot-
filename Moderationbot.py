@@ -106,6 +106,12 @@ else:
     print("URL not found")
 
 
+@bot.event
+async def setup_hook():
+    """Runs before bot connects - starts web server immediately"""
+    print(f"[{datetime.now()}] Running setup_hook...", flush=True)
+    await start_web_server()
+
 async def health_check(request):
     global bot_updating, bot_emergency_shutdown, bot_owner_sleeping
     # Add this line at the top
@@ -847,23 +853,39 @@ async def health_check(request):
 
 
 async def start_web_server():
+    print(f"[{datetime.now()}] Starting web server on port {PORT}...", flush=True)
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(PORT))
+    site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
-    print(f'Web server started on port {PORT}')
+    print(f'[{datetime.now()}] ✅ Web server started on port {PORT}', flush=True)
+
 
 
 @bot.event
 async def on_ready():
-    global bot_start_time, commands_synced
-    bot_start_time = datetime.datetime.now()
-    print(f'{bot.user} has connected to Discord!')
-    bot.loop.create_task(start_web_server())
+    global bot_start_time
+    bot_start_time = datetime.now()
+    print(f'[{datetime.now()}] {bot.user} has connected to Discord!', flush=True)
+
+    try:
+        print("Attempting to sync commands...", flush=True)
+        synced = await bot.tree.sync()
+        print(f"✅ Successfully synced {len(synced)} command(s)", flush=True)
+    except discord.Forbidden as e:
+        print(f"❌ Failed to sync commands (insufficient permissions): {e}", flush=True)
+    except discord.HTTPException as e:
+        print(f"❌ Failed to sync commands (HTTP error): {e}", flush=True)
+        print(f"Status: {e.status}", flush=True)
+        print(f"Response: {e.text}", flush=True)
+    except Exception as e:
+        print(f"❌ Failed to sync commands (unexpected error): {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
     # FIXED: Only sync commands once to prevent rate limiting
     if not commands_synced:
