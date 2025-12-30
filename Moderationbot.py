@@ -204,6 +204,24 @@ async def health_check(request):
                     color: #ffaaaa;
                     margin-top: 20px;
                 }
+                .github-button {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 12px 24px;
+                    background: rgba(36, 41, 47, 0.9);
+                    color: #ffffff;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    border: 2px solid rgba(100, 180, 220, 0.3);
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                }
+                .github-button:hover {
+                    background: rgba(48, 54, 61, 1);
+                    border-color: rgba(100, 180, 220, 0.6);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                }
                 @media (max-width: 480px) {
                     .container {
                         padding: 30px 20px;
@@ -226,11 +244,14 @@ async def health_check(request):
                 <div class="status-icon">
                     <span class="shark-icon">🦈</span>
                 </div>
-                <h1>Bot is <span class="status">Offline</span></h1>
+                <h1>Shark Bot is <span class="status">Offline</span></h1>
                 <p style="color: #7eb8d6; margin-bottom: 20px;">Shark in the deep waters</p>
                 <div class="info-message">
                     🔴 The bot has gone into the deep. Emergency shutdown activated. Please check back later.
                 </div>
+                <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                    🔗 View on GitHub
+                </a>
             </div>
         </body>
         </html>
@@ -239,21 +260,24 @@ async def health_check(request):
 
     # Check if owner is sleeping
     if bot_owner_sleeping:
-        html = """
+        uptime = datetime.datetime.now() - bot_start_time
+        hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <title>Discord Bot Status</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                * {
+                * {{
                     margin: 0;
                     padding: 0;
                     box-sizing: border-box;
-                }
-                body {
+                }}
+                body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: linear-gradient(180deg, #001a33 0%, #002d4d 50%, #001a33 100%);
+                    background: linear-gradient(180deg, #003366 0%, #006699 50%, #003366 100%);
                     min-height: 100vh;
                     display: flex;
                     justify-content: center;
@@ -261,8 +285,8 @@ async def health_check(request):
                     padding: 20px;
                     position: relative;
                     overflow: hidden;
-                }
-                body::before {
+                }}
+                body::before {{
                     content: '';
                     position: absolute;
                     top: 0;
@@ -270,117 +294,169 @@ async def health_check(request):
                     width: 100%;
                     height: 100%;
                     background: 
-                        radial-gradient(ellipse at 30% 40%, rgba(50, 100, 150, 0.15) 0%, transparent 50%),
-                        radial-gradient(ellipse at 70% 60%, rgba(30, 80, 120, 0.15) 0%, transparent 50%);
-                    animation: deepWater 10s ease-in-out infinite;
-                }
-                @keyframes deepWater {
-                    0%, 100% { opacity: 0.4; transform: translateY(0); }
-                    50% { opacity: 0.7; transform: translateY(-10px); }
-                }
-                .seaweed {
+                        radial-gradient(ellipse at 30% 30%, rgba(0, 200, 255, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 70%, rgba(0, 150, 200, 0.15) 0%, transparent 50%);
+                    animation: oceanWaves 10s ease-in-out infinite;
+                }}
+                @keyframes oceanWaves {{
+                    0%, 100% {{ opacity: 0.5; }}
+                    50% {{ opacity: 0.8; }}
+                }}
+                .fish {{
                     position: absolute;
-                    bottom: 0;
-                    width: 30px;
-                    height: 150px;
-                    background: linear-gradient(to top, #1a4d2e, #2d6a4f);
-                    border-radius: 50% 50% 0 0;
-                    opacity: 0.3;
-                    animation: sway 4s ease-in-out infinite;
-                }
-                .seaweed:nth-child(1) { left: 10%; animation-delay: 0s; }
-                .seaweed:nth-child(2) { left: 25%; height: 120px; animation-delay: 1s; }
-                .seaweed:nth-child(3) { right: 20%; height: 180px; animation-delay: 0.5s; }
-                .seaweed:nth-child(4) { right: 5%; animation-delay: 1.5s; }
-                @keyframes sway {
-                    0%, 100% { transform: rotate(-5deg); }
-                    50% { transform: rotate(5deg); }
-                }
-                .container {
-                    background: rgba(0, 40, 70, 0.85);
+                    font-size: 25px;
+                    opacity: 0.4;
+                    animation: fishSwim 15s linear infinite;
+                }}
+                .fish:nth-child(1) {{ top: 20%; animation-delay: 0s; }}
+                .fish:nth-child(2) {{ top: 50%; animation-delay: 5s; }}
+                .fish:nth-child(3) {{ top: 80%; animation-delay: 10s; }}
+                @keyframes fishSwim {{
+                    0% {{ left: -100px; transform: scaleX(1); }}
+                    48% {{ transform: scaleX(1); }}
+                    52% {{ transform: scaleX(-1); }}
+                    100% {{ left: 110%; transform: scaleX(-1); }}
+                }}
+                .container {{
+                    background: rgba(0, 60, 100, 0.9);
                     border-radius: 20px;
-                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(50, 150, 200, 0.1);
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(0, 200, 255, 0.1);
                     padding: 40px;
                     max-width: 500px;
                     width: 100%;
                     text-align: center;
                     position: relative;
                     z-index: 10;
-                    border: 2px solid rgba(100, 180, 220, 0.2);
-                }
-                .status-icon {
+                    border: 2px solid rgba(0, 200, 255, 0.3);
+                }}
+                .status-icon {{
                     width: 100px;
                     height: 100px;
-                    background: linear-gradient(135deg, #2d5f8d 0%, #1a3a52 100%);
+                    background: linear-gradient(135deg, #00cc88 0%, #008855 100%);
                     border-radius: 50%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
                     margin: 0 auto 20px;
-                    border: 3px solid rgba(100, 180, 220, 0.4);
-                    animation: float 3s ease-in-out infinite;
-                }
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-10px); }
-                }
-                .shark-icon {
+                    animation: pulse 2s infinite;
+                    border: 3px solid rgba(0, 204, 136, 0.5);
+                }}
+                @keyframes pulse {{
+                    0%, 100% {{
+                        transform: scale(1);
+                        box-shadow: 0 0 20px rgba(0, 204, 136, 0.5);
+                    }}
+                    50% {{
+                        transform: scale(1.05);
+                        box-shadow: 0 0 40px rgba(0, 204, 136, 0.8);
+                    }}
+                }}
+                .shark-icon {{
                     font-size: 50px;
-                    animation: swim 2s ease-in-out infinite;
-                }
-                @keyframes swim {
-                    0%, 100% { transform: translateX(0); }
-                    50% { transform: translateX(5px); }
-                }
-                h1 {
-                    color: #cce7f5;
+                }}
+                h1 {{
+                    color: #e0f7ff;
                     margin-bottom: 10px;
                     font-size: 28px;
-                    text-shadow: 0 0 15px rgba(100, 180, 220, 0.5);
-                }
-                .status {
-                    color: #5dade2;
+                    text-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
+                }}
+                .status {{
+                    color: #00ff88;
                     font-weight: bold;
                     font-size: 18px;
                     margin-bottom: 30px;
-                    text-shadow: 0 0 10px rgba(93, 173, 226, 0.5);
-                }
-                .info-message {
-                    background: rgba(93, 173, 226, 0.15);
-                    border-left: 4px solid #5dade2;
+                    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+                }}
+                .info-grid {{
+                    display: grid;
+                    gap: 15px;
+                    margin-top: 30px;
+                }}
+                .info-item {{
+                    background: rgba(0, 100, 150, 0.3);
                     padding: 15px;
-                    border-radius: 5px;
-                    color: #a8d8ea;
+                    border-radius: 10px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border: 1px solid rgba(0, 200, 255, 0.2);
+                }}
+                .info-label {{
+                    color: #7eb8d6;
+                    font-weight: 500;
+                }}
+                .info-value {{
+                    color: #e0f7ff;
+                    font-weight: bold;
+                }}
+                .bot-name {{
+                    color: #00ddff;
+                    font-weight: bold;
+                    text-shadow: 0 0 5px rgba(0, 221, 255, 0.5);
+                }}
+                .github-button {{
+                    display: inline-block;
                     margin-top: 20px;
-                }
-                @media (max-width: 480px) {
-                    .container {
+                    padding: 12px 24px;
+                    background: rgba(36, 41, 47, 0.9);
+                    color: #ffffff;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    border: 2px solid rgba(100, 180, 220, 0.3);
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                }}
+                .github-button:hover {{
+                    background: rgba(48, 54, 61, 1);
+                    border-color: rgba(100, 180, 220, 0.6);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                }}
+                @media (max-width: 480px) {{
+                    .container {{
                         padding: 30px 20px;
-                    }
-                    h1 {
+                    }}
+                    h1 {{
                         font-size: 24px;
-                    }
-                }
+                    }}
+                }}
             </style>
         </head>
         <body>
-            <div class="seaweed"></div>
-            <div class="seaweed"></div>
-            <div class="seaweed"></div>
-            <div class="seaweed"></div>
+            <div class="fish">🐠</div>
+            <div class="fish">🐟</div>
+            <div class="fish">🐡</div>
             <div class="container">
                 <div class="status-icon">
                     <span class="shark-icon">🦈</span>
                 </div>
-                <h1>Shark is <span class="status">Sleeping</span></h1>
-                <p style="color: #7eb8d6; margin-bottom: 20px;">Resting in the deep sea</p>
-                <div class="info-message">
-                    😴 SorynTech is sleeping and will not respond to any PRs. The shark is resting in its underwater cave.
+                <h1>Shark Owner is <span class="status">Sleeping</span></h1>
+                <p style="color: #7eb8d6; margin-bottom: 20px;">SorynTech is asleep and isn't looking at PRs on GitHub right now</p>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">🦈 Shark Name</span>
+                        <span class="info-value bot-name">{bot.user.name if bot.user else "Loading..."}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">⏱️ Swim Time</span>
+                        <span class="info-value">{hours}h {minutes}m {seconds}s</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">🏝️ Ocean Territories</span>
+                        <span class="info-value">{len(bot.guilds)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">📡 Sonar Ping</span>
+                        <span class="info-value">{round(bot.latency * 1000)}ms</span>
+                    </div>
                 </div>
+                <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                    🔗 View on GitHub
+                </a>
             </div>
         </body>
         </html>
-        """
+"""
         return web.Response(text=html, content_type='text/html', status=200)
 
     # Check if bot is in update mode
@@ -486,6 +562,24 @@ async def health_check(request):
                     color: #ffcc99;
                     margin-top: 20px;
                 }
+                .github-button {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 12px 24px;
+                    background: rgba(36, 41, 47, 0.9);
+                    color: #ffffff;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    border: 2px solid rgba(100, 180, 220, 0.3);
+                    transition: all 0.3s ease;
+                    font-weight: 500;
+                }
+                .github-button:hover {
+                    background: rgba(48, 54, 61, 1);
+                    border-color: rgba(100, 180, 220, 0.6);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                }
                 @media (max-width: 480px) {
                     .container {
                         padding: 30px 20px;
@@ -503,11 +597,14 @@ async def health_check(request):
                 <div class="status-icon">
                     <span class="update-icon">⚙️</span>
                 </div>
-                <h1>Shark is <span class="status">Updating</span></h1>
+                <h1>Shark Bot is <span class="status">Updating</span></h1>
                 <p style="color: #7eb8d6; margin-bottom: 20px;">Maintenance dive in progress</p>
                 <div class="info-message">
                     ⚠️ The shark is performing maintenance in the deep. Check back in a few minutes.
                 </div>
+                <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                    🔗 View on GitHub
+                </a>
             </div>
         </body>
         </html>
@@ -649,6 +746,24 @@ async def health_check(request):
                 font-weight: bold;
                 text-shadow: 0 0 5px rgba(0, 221, 255, 0.5);
             }}
+            .github-button {{
+                display: inline-block;
+                margin-top: 20px;
+                padding: 12px 24px;
+                background: rgba(36, 41, 47, 0.9);
+                color: #ffffff;
+                text-decoration: none;
+                border-radius: 8px;
+                border: 2px solid rgba(100, 180, 220, 0.3);
+                transition: all 0.3s ease;
+                font-weight: 500;
+            }}
+            .github-button:hover {{
+                background: rgba(48, 54, 61, 1);
+                border-color: rgba(100, 180, 220, 0.6);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }}
             @media (max-width: 480px) {{
                 .container {{
                     padding: 30px 20px;
@@ -687,6 +802,9 @@ async def health_check(request):
                     <span class="info-value">{round(bot.latency * 1000)}ms</span>
                 </div>
             </div>
+            <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                🔗 View on GitHub
+            </a>
         </div>
     </body>
     </html>
@@ -1417,16 +1535,22 @@ async def slash_killswitch(interaction: discord.Interaction):
     bot_emergency_shutdown = not bot_emergency_shutdown
 
     if bot_emergency_shutdown:
+        # Set bot status to invisible
+        await bot.change_presence(status=discord.Status.invisible)
         await interaction.response.send_message(
             "🔴 **EMERGENCY SHUTDOWN ACTIVATED**\n"
             "All commands are now disabled except /restart-bot.\n"
-            "The status page now shows the bot as offline.",
+            "The status page now shows the bot as offline.\n"
+            "Bot status set to invisible.",
             ephemeral=True
         )
     else:
+        # Set bot status back to online
+        await bot.change_presence(status=discord.Status.online)
         await interaction.response.send_message(
             "✅ **EMERGENCY SHUTDOWN DEACTIVATED**\n"
-            "Bot is now accepting commands normally.",
+            "Bot is now accepting commands normally.\n"
+            "Bot status set to online.",
             ephemeral=True
         )
 
@@ -1448,9 +1572,12 @@ async def slash_restart_bot(interaction: discord.Interaction):
         return
 
     bot_emergency_shutdown = False
+    # Set bot status back to online
+    await bot.change_presence(status=discord.Status.online)
     await interaction.response.send_message(
         "✅ **BOT RESTARTED**\n"
-        "Emergency shutdown mode disabled. Bot is now accepting all commands.",
+        "Emergency shutdown mode disabled. Bot is now accepting all commands.\n"
+        "Bot status set to online.",
         ephemeral=True
     )
 
@@ -1470,7 +1597,7 @@ async def slash_owner_sleep(interaction: discord.Interaction):
     if bot_owner_sleeping:
         await interaction.response.send_message(
             "😴 **OWNER SLEEP STATUS ENABLED**\n"
-            "The status page now shows 'SorynTech is sleeping and will not respond to any PRs'.\n"
+            "The status page now shows 'Shark Owner is Sleeping' with the message about GitHub PRs.\n"
             "⚠️ Note: Bot commands remain fully functional.",
             ephemeral=True
         )
@@ -1495,16 +1622,22 @@ async def slash_updatemode(interaction: discord.Interaction):
     bot_updating = not bot_updating
 
     if bot_updating:
+        # Set bot status to idle
+        await bot.change_presence(status=discord.Status.idle)
         await interaction.response.send_message(
             "🔄 **UPDATE MODE ENABLED**\n"
-            "The status page now displays 'Bot is Updating'.\n"
+            "The status page now displays 'Shark Bot is Updating'.\n"
+            "Bot status set to idle.\n"
             "Use this command again to disable update mode.",
             ephemeral=True
         )
     else:
+        # Set bot status back to online
+        await bot.change_presence(status=discord.Status.online)
         await interaction.response.send_message(
             "✅ **UPDATE MODE DISABLED**\n"
-            "The status page now shows normal bot status.",
+            "The status page now shows normal bot status.\n"
+            "Bot status set to online.",
             ephemeral=True
         )
 
@@ -1682,7 +1815,195 @@ async def slash_serverinfo(interaction: discord.Interaction):
 
     await interaction.followup.send(embed=embed)
 
+@bot.tree.command(name="modnote", description="Add a note about a user (visible only to mods)")
+@app_commands.describe(
+    user="The user to add a note about",
+    note="The note content"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_modnote(interaction: discord.Interaction, user: discord.User, note: str):
+    if not await check_emergency_shutdown(interaction):
+        return
 
+    await interaction.response.defer(ephemeral=True)
+
+    # Store the note in your database here
+    # Example: await db.add_modnote(interaction.guild.id, user.id, interaction.user.id, note)
+
+    await interaction.followup.send(
+        f"✅ Moderation note added for {user.mention}:\n```{note}```",
+        ephemeral=True
+    )
+
+
+@bot.tree.command(name="warn", description="Issue a warning to a user")
+@app_commands.describe(
+    member="The member to warn",
+    reason="Reason for the warning"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_warn(interaction: discord.Interaction, member: discord.Member, reason: str):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+
+    # Store the warning in your database here
+    # Example: case_id = await db.add_warning(interaction.guild.id, member.id, interaction.user.id, reason)
+
+    try:
+        await member.send(
+            f"⚠️ You have been warned in **{interaction.guild.name}**\n"
+            f"**Reason:** {reason}\n"
+            f"**Moderator:** {interaction.user.mention}"
+        )
+        dm_status = "User has been notified via DM."
+    except discord.Forbidden:
+        dm_status = "Could not DM the user."
+
+    await interaction.followup.send(
+        f"✅ {member.mention} has been warned.\n"
+        f"**Reason:** {reason}\n"
+        f"{dm_status}"
+    )
+
+
+@bot.tree.command(name="warnings", description="View warnings for a specific user")
+@app_commands.describe(
+    user="The user to view warnings for"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_warnings(interaction: discord.Interaction, user: discord.User):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    # Fetch warnings from your database here
+    # Example: warnings = await db.get_warnings(interaction.guild.id, user.id)
+
+    # Mock data for demonstration
+    warnings = []  # Replace with actual database query
+
+    if not warnings:
+        await interaction.followup.send(
+            f"ℹ️ {user.mention} has no warnings.",
+            ephemeral=True
+        )
+        return
+
+    embed = discord.Embed(
+        title=f"Warnings for {user.name}",
+        description=f"Total warnings: {len(warnings)}",
+        color=discord.Color.orange()
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+
+    for idx, warning in enumerate(warnings[:10], 1):  # Show last 10 warnings
+        # Example warning structure: {case_id, reason, moderator_id, timestamp}
+        embed.add_field(
+            name=f"Case #{warning['case_id']} - {warning['timestamp']}",
+            value=f"**Reason:** {warning['reason']}\n**Moderator:** <@{warning['moderator_id']}>",
+            inline=False
+        )
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="clearwarns", description="Clear all warnings for a user")
+@app_commands.describe(
+    user="The user to clear warnings for"
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def slash_clearwarns(interaction: discord.Interaction, user: discord.User):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    # Clear warnings from your database here
+    # Example: count = await db.clear_warnings(interaction.guild.id, user.id)
+
+    count = 0  # Replace with actual count from database
+
+    if count == 0:
+        await interaction.followup.send(
+            f"ℹ️ {user.mention} has no warnings to clear.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.followup.send(
+        f"✅ Cleared {count} warning(s) for {user.mention}",
+        ephemeral=True
+    )
+
+
+@bot.tree.command(name="case", description="View details of a specific moderation case")
+@app_commands.describe(
+    case_id="The case ID to view"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_case(interaction: discord.Interaction, case_id: int):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    # Fetch case from your database here
+    # Example: case = await db.get_case(interaction.guild.id, case_id)
+
+    case = None  # Replace with actual database query
+
+    if not case:
+        await interaction.followup.send(
+            f"❌ Case #{case_id} not found.",
+            ephemeral=True
+        )
+        return
+
+    # Example case structure: {case_id, type, user_id, moderator_id, reason, timestamp}
+    embed = discord.Embed(
+        title=f"Case #{case['case_id']}",
+        color=discord.Color.blue(),
+        timestamp=case['timestamp']
+    )
+    embed.add_field(name="Type", value=case['type'].capitalize(), inline=True)
+    embed.add_field(name="User", value=f"<@{case['user_id']}>", inline=True)
+    embed.add_field(name="Moderator", value=f"<@{case['moderator_id']}>", inline=True)
+    embed.add_field(name="Reason", value=case['reason'] or "No reason provided", inline=False)
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="reason", description="Add/edit reason for a moderation action")
+@app_commands.describe(
+    case_id="The case ID to update",
+    reason="The new reason"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_reason(interaction: discord.Interaction, case_id: int, reason: str):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    # Update reason in your database here
+    # Example: success = await db.update_case_reason(interaction.guild.id, case_id, reason)
+
+    success = True  # Replace with actual database operation
+
+    if not success:
+        await interaction.followup.send(
+            f"❌ Case #{case_id} not found or could not be updated.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.followup.send(
+        f"✅ Updated reason for case #{case_id}:\n```{reason}```",
+        ephemeral=True
+    )
 # ===============WIP ROLE MANAGMENT================================================================================
 @bot.tree.command(name="addrole", description="Add a role to a user")
 async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):

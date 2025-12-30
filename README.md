@@ -10,29 +10,41 @@ The bot includes a beautiful underwater shark-themed web status page that displa
 - Deep ocean blue gradient background
 - Animated swimming fish (🐠🐟🐡)
 - Green pulsing shark icon
+- **Discord Status**: 🟢 Online
 - Displays:
   - **Shark Name** (Bot name)
   - **Swim Time** (Uptime)
   - **Ocean Territories** (Server count)
   - **Sonar Ping** (Latency in ms)
+- **GitHub Button**: Links to repository
 
-### Emergency Shutdown - "Shark in the Deep" 🔴
+### Emergency Shutdown - "Shark Bot is Offline" 🔴
 - Dark deep ocean theme with animated bubbles
 - Red pulsing shark icon with warning border
+- **Discord Status**: ⚫ Invisible (appears offline)
+- **HTTP Status**: 503 Service Unavailable
 - All commands blocked except owner commands
 - Message: "The bot has gone into the deep"
+- **GitHub Button**: Links to repository
 
-### Owner Sleep Mode - "Shark is Sleeping" 💤
-- Dark blue ocean with swaying seaweed
-- Floating shark with sleep emoji (🦈💤)
+### Owner Sleep Mode - "Shark Owner is Sleeping" 💤
+- Normal online theme with all bot statistics
+- Animated swimming fish (🐠🐟🐡)
+- Green pulsing shark icon
+- **Discord Status**: 🟢 Online
 - **Commands remain fully functional**
-- Message: "SorynTech is sleeping and will not respond to any PRs"
+- Message: "SorynTech is asleep and isn't looking at PRs on GitHub right now"
+- Shows all normal stats (uptime, servers, latency)
+- **GitHub Button**: Links to repository
 
-### Update Mode - "Shark is Updating" ⚙️
+### Update Mode - "Shark Bot is Updating" ⚙️
 - Ocean blue with swimming sharks crossing the screen
 - Spinning gear icon with orange/amber glow
+- **Discord Status**: 🟡 Idle
+- **HTTP Status**: 503 Service Unavailable
 - Commands remain functional
 - Message: "The shark is performing maintenance in the deep"
+- **GitHub Button**: Links to repository
 
 All status pages feature:
 - Animated water effects and movement
@@ -40,18 +52,19 @@ All status pages feature:
 - Ocean-themed color palettes
 - Responsive design for mobile and desktop
 - Custom animations (bubbles, fish swimming, seaweed swaying)
+- **GitHub repository link button** on every page
 
 ---
 
 ## 🎮 Command Categories
 
 ### 👑 Owner-Only Commands
-| Command | Description | Blocks Commands? |
-|---------|-------------|------------------|
-| `/killswitch` | Toggle emergency shutdown mode | ✅ Yes - Shows "Offline" |
-| `/restart-bot` | Restart bot from emergency shutdown | N/A |
-| `/owner-sleep` | Toggle sleep status on status page | ❌ No - Only changes page |
-| `/updatemode` | Toggle update mode on status page | ❌ No - Only changes page |
+| Command | Description | Blocks Commands? | Discord Status |
+|---------|-------------|------------------|----------------|
+| `/killswitch` | Toggle emergency shutdown mode | ✅ Yes - Shows "Offline" | ⚫ Invisible |
+| `/restart-bot` | Restart bot from emergency shutdown | N/A | 🟢 Online |
+| `/owner-sleep` | Toggle sleep status on status page | ❌ No - Only changes page | 🟢 Online |
+| `/updatemode` | Toggle update mode on status page | ❌ No - Only changes page | 🟡 Idle |
 
 ### 🔨 Moderation Commands
 | Command | Description | Required Permission |
@@ -62,6 +75,16 @@ All status pages feature:
 | `/mute` | Timeout a member (in seconds) | Moderate Members |
 | `/unmute` | Remove timeout from a member | Moderate Members |
 | `/nickname` | Change a member's nickname | Manage Nicknames |
+
+### 📋 Moderation Tracking Commands
+| Command | Description | Required Permission |
+|---------|-------------|---------------------|
+| `/modnote` | Add a note about a user (visible only to mods) | Moderate Members |
+| `/warn` | Issue a warning to a user | Moderate Members |
+| `/warnings` | View warnings for a specific user | Moderate Members |
+| `/clearwarns` | Clear all warnings for a user | Administrator |
+| `/case` | View details of a specific moderation case | Moderate Members |
+| `/reason` | Add/edit reason for a moderation action | Moderate Members |
 
 ### 🔊 Voice Moderation Commands
 | Command | Description | Required Permission |
@@ -100,13 +123,13 @@ All status pages feature:
 
 ---
 
-## ✅ Completed Commands (27 Total)
+## ✅ Completed Commands (33 Total)
 
 ### Owner Commands (4)
-- [x] `/killswitch` - Emergency bot shutdown with "offline" status
+- [x] `/killswitch` - Emergency bot shutdown with invisible status
 - [x] `/restart-bot` - Restart from emergency shutdown
 - [x] `/owner-sleep` - Toggle sleep status page
-- [x] `/updatemode` - Toggle update mode status page
+- [x] `/updatemode` - Toggle update mode status page with idle status
 
 ### Moderation Commands (6)
 - [x] `/kick` - Kick a member from the server
@@ -115,6 +138,14 @@ All status pages feature:
 - [x] `/mute` - Timeout a member
 - [x] `/unmute` - Remove timeout from a member
 - [x] `/nickname` - Change a member's nickname
+
+### Moderation Tracking (6)
+- [x] `/modnote` - Add a note about a user (visible only to mods)
+- [x] `/warn` - Issue a warning to a user
+- [x] `/warnings` - View warnings for a specific user
+- [x] `/clearwarns` - Clear all warnings for a user
+- [x] `/case` - View details of a specific moderation case
+- [x] `/reason` - Add/edit reason for a moderation action
 
 ### Voice Moderation (5)
 - [x] `/dc` - Disconnect a user from voice
@@ -148,14 +179,6 @@ All status pages feature:
 ### Information & Utility
 - [ ] `membercount` - Display server member statistics
 - [ ] `botinfo` - Display bot statistics and information
-
-### Moderation Tracking
-- [ ] `modnote` - Add a note about a user (visible only to mods)
-- [ ] `warn` - Issue a warning to a user
-- [ ] `warnings` - View warnings for a specific user
-- [ ] `clearwarns` - Clear all warnings for a user
-- [ ] `case` - View details of a specific moderation case
-- [ ] `reason` - Add/edit reason for a moderation action
 
 ---
 
@@ -211,6 +234,24 @@ All status pages feature:
 - **Real-time Status**: Shows current bot state with beautiful underwater theme
 - **Multiple States**: Online, Offline (Emergency), Sleeping, Updating
 - **Animated Effects**: Swimming fish, bubbles, seaweed, water movement
+- **GitHub Integration**: Every status page includes a link to the repository
+- **HTTP Status Codes**: 
+  - Normal/Sleeping: 200 OK
+  - Emergency Shutdown/Update Mode: 503 Service Unavailable
+
+### Discord Presence Status
+The bot automatically changes its Discord status based on mode:
+- **🟢 Online**: Normal operation and owner sleep mode
+- **🟡 Idle**: Update mode (maintenance)
+- **⚫ Invisible**: Emergency shutdown (appears offline)
+
+### Moderation Tracking System
+- **Persistent Storage**: All warnings, notes, and cases stored in database
+- **Case Management**: Each moderation action gets a unique case ID
+- **Warning System**: Issue and track warnings for users
+- **Mod Notes**: Private notes visible only to moderators
+- **Reason Editing**: Update reasons for past moderation actions
+- **Warning History**: View all warnings for any user
 
 ### Error Handling
 Comprehensive error handling for all commands:
@@ -225,6 +266,7 @@ Comprehensive error handling for all commands:
 - Permission verification before actions
 - Owner-only commands for critical operations
 - Emergency shutdown mode
+- Administrator-only access for clearing warnings
 
 ### User Information Features
 - Detailed user profiles
@@ -240,8 +282,8 @@ Comprehensive error handling for all commands:
 ---
 
 ## 📊 Progress Statistics
-- **Completed:** 27 commands
-- **In Progress:** 8 commands
+- **Completed:** 33 commands
+- **In Progress:** 2 commands
 - **Planned:** 30 commands
 - **Total Roadmap:** 65 commands
 
@@ -253,6 +295,7 @@ Comprehensive error handling for all commands:
 - **discord.py** - Discord API wrapper
 - **aiohttp** - Web server for status page
 - **Python 3.8+** - Programming language
+- **Database** - For storing moderation cases, warnings, and notes (SQLite/PostgreSQL recommended)
 
 ### Requirements
 - Discord Bot Token
@@ -278,6 +321,31 @@ DISCORD_BOT_URL=your_bot_url_here (optional)
 PORT=10000 (optional, defaults to 10000)
 ```
 
+### Database Schema (Recommended)
+For the moderation tracking system, implement these tables:
+```sql
+-- Cases table (for all moderation actions)
+CREATE TABLE cases (
+    case_id INTEGER PRIMARY KEY,
+    guild_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    moderator_id INTEGER NOT NULL,
+    type TEXT NOT NULL,  -- 'warn', 'kick', 'ban', 'mute', etc.
+    reason TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Mod notes table
+CREATE TABLE modnotes (
+    note_id INTEGER PRIMARY KEY,
+    guild_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    moderator_id INTEGER NOT NULL,
+    note TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ### Status Page Access
 Once the bot is running, access the status page at:
 - `http://localhost:10000/` (local development)
@@ -286,6 +354,22 @@ Once the bot is running, access the status page at:
 ---
 
 ## 🔄 Recent Updates
+
+### December 30, 2025 (Latest)
+- 🎨 Updated status page titles: "Shark Bot is Offline" and "Shark Bot is Updating"
+- 😴 Modified owner sleep page to show "Shark Owner is Sleeping" with GitHub PR message
+- 🔗 Added GitHub repository button to all status pages
+- 🎭 Implemented Discord presence status changes:
+  - Emergency shutdown → Invisible (appears offline)
+  - Update mode → Idle (yellow/orange status)
+  - Normal/Sleep mode → Online (green status)
+
+### December 30, 2025 (Earlier)
+- ✨ Added complete moderation tracking system
+- 🆕 New commands: `/modnote`, `/warn`, `/warnings`, `/clearwarns`, `/case`, `/reason`
+- 📊 Database-backed case and warning management
+- 🔔 DM notifications for warnings
+- 🛡️ Enhanced permission checks (Administrator required for clearwarns)
 
 ### December 28, 2025
 - ✨ Added underwater shark theme to all status pages
@@ -310,12 +394,18 @@ Once the bot is running, access the status page at:
 - Bot respects role hierarchy (cannot moderate users with higher roles)
 - Audit log access required for moderation history in `/userinfo`
 - Status page updates in real-time based on bot state
+- **Database required** for moderation tracking features (warnings, cases, notes)
+- Moderation actions attempt to DM users when possible
+- **Discord status automatically changes** based on bot mode (Online/Idle/Invisible)
+- **GitHub repository link** available on all status pages: https://github.com/soryntech/discord-moderation-bot
 
 ---
 
 ## 🤝 Contributing
 
 This is a personal project by SorynTech. If you have suggestions or find bugs, feel free to reach out!
+
+**Repository**: https://github.com/soryntech/discord-moderation-bot
 
 ---
 
