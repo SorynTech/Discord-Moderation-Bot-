@@ -56,6 +56,47 @@ All status pages feature:
 
 ---
 
+## 🔧 Debug Files
+
+### Token Debug Script
+A utility script for troubleshooting Discord token issues without logging into the bot.
+
+**File**: `debug env.py`
+
+**⚠️ IMPORTANT**: This script should **ONLY be run locally** on your development machine. **DO NOT run this on your production server** (like Render) as it could interfere with your running bot instance.
+
+**Features**:
+- ✅ Verifies token exists in `.env` file
+- 📏 Checks token length (should be 70+ characters)
+- 🔍 Shows first/last 10 characters for verification
+- ⚠️ Detects common issues (spaces, quotes, too short)
+- 🤖 **Fetches bot username from Discord API** (without logging in)
+- 🆔 Displays bot's Discord User ID
+
+- ⚠️ **RUN THIS FILE LOCALLY NOT ON YOUR PRODUCTION SERVER TO PREVENT LEAKING SECRETS TO PEOPLE OUTSIDE BOT DEVELOPMENT**
+```
+
+**Example Output**:
+```
+=== TOKEN DEBUG ===
+Token exists: True
+Token length: 72
+Token first 10 chars: 1234567890...
+Token last 10 chars: ...0987654321
+
+Bot: SharkBot (ID: 1234567890123456789)
+==================
+```
+
+**Why This Exists**:
+- Safe for LOCAL DEBUG environments (doesn't actually log the bot in)
+- Useful for debugging token issues before deploying
+- Prevents accidental dual logins that could cause rate limiting
+- Quickly identifies which bot a token belongs to
+- **Run locally only** to avoid conflicts with your live bot
+
+---
+
 ## 🎮 Command Categories
 
 ### 👑 Owner-Only Commands
@@ -356,6 +397,8 @@ Once the bot is running, access the status page at:
 ## 🔄 Recent Updates
 
 ### December 30, 2025 (Latest)
+- 🔧 Added token debug script for troubleshooting without logging in
+- 🤖 Debug script fetches bot username directly from Discord API
 - 🎨 Updated status page titles: "Shark Bot is Offline" and "Shark Bot is Updating"
 - 😴 Modified owner sleep page to show "Shark Owner is Sleeping" with GitHub PR message
 - 🔗 Added GitHub repository button to all status pages
@@ -398,6 +441,7 @@ Once the bot is running, access the status page at:
 - Moderation actions attempt to DM users when possible
 - **Discord status automatically changes** based on bot mode (Online/Idle/Invisible)
 - **GitHub repository link** available on all status pages: https://github.com/soryntech/discord-moderation-bot
+- **Debug script available** for token troubleshooting (local use only, not for production servers)
 
 ---
 
