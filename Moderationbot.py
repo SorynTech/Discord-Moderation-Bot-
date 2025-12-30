@@ -2193,7 +2193,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"BOT CRASHED: {e}")
             import traceback
-            import traceback
 
             traceback.print_exc()
 
