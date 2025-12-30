@@ -300,7 +300,7 @@ async def health_check(request):
 
     # Check if owner is sleeping
     if bot_owner_sleeping:
-        uptime = datetime.datetime.now() - bot_start_time
+        uptime = datetime.now() - bot_start_time
         hours, remainder = divmod(int(uptime.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
         html = f"""
@@ -868,7 +868,7 @@ async def start_web_server():
 
 @bot.event
 async def on_ready():
-    global bot_start_time
+    global bot_start_time, commands_synced
     bot_start_time = datetime.now()
     print(f'[{datetime.now()}] {bot.user} has connected to Discord!', flush=True)
 
