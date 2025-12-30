@@ -826,31 +826,34 @@ async def on_ready():
     global bot_start_time, commands_synced
     bot_start_time = datetime.datetime.now()
     print(f'{bot.user} has connected to Discord!')
+    print(f'Bot is in {len(bot.guilds)} guilds')
+
+    # Start web server
     bot.loop.create_task(start_web_server())
 
-    # FIXED: Only sync commands once to prevent rate limiting
+    # Only sync commands ONCE to prevent rate limits
     if not commands_synced:
         try:
-            print("Attempting to sync commands...")
+            # Add delay to avoid immediate sync
+            await asyncio.sleep(5)
+
+            print("Syncing slash commands...")
             synced = await bot.tree.sync()
             commands_synced = True
+
             print(f"✅ Successfully synced {len(synced)} command(s)")
+
         except discord.HTTPException as e:
-            if e.status == 429:  # Rate limit
-                print(f"⚠️ Rate limited when syncing commands. Will retry automatically.")
-                retry_after = e.response.headers.get('Retry-After', 60)
-                print(f"Retry after: {retry_after} seconds")
-                # Don't crash - let Discord.py handle the retry
+            if e.status == 429:
+                retry_after = int(e.response.headers.get('Retry-After', 3600))
+                print(f"⚠️ Command sync rate limited for {retry_after // 60} minutes")
+                print("⚠️ Commands should work from previous sync")
             else:
-                print(f"❌ Failed to sync commands (HTTP error): {e}")
-                print(f"Status: {e.status}")
-                print(f"Response: {e.text}")
+                print(f"❌ Failed to sync commands: {e}")
         except Exception as e:
-            print(f"❌ Failed to sync commands (unexpected error): {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ Unexpected sync error: {e}")
     else:
-        print("Commands already synced, skipping sync")
+        print("Commands already synced, skipping")
 
 
 # CRITICAL FIX: Add on_message handler to prevent bot loops
@@ -1972,16 +1975,63 @@ if __name__ == "__main__":
     print(f"PORT: {PORT}")
 
     if not TOKEN:
-        print("ERROR: DISCORD_TOKEN not found in environment variables!")
+        print("ERROR: DISCORD_TOKEN not found!")
         print("Make sure your .env file contains DISCORD_TOKEN=your_token_here")
     else:
-        print("Starting bot...")
-        try:
-            bot.run(TOKEN, log_handler=None)
-        except Exception as e:
-            print(f"BOT CRASHED: {e}")
-            import traceback
+        print("Starting bot with Cloudflare protection...")
 
-            traceback.print_exc()
+        max_retries = 5
+        retry_count = 0
+        base_wait = 120  # 2 minutes initial wait
+
+        while retry_count < max_retries:
+            try:
+                print(f"\n🔄 Connection attempt {retry_count + 1}/{max_retries}")
+                print(f"⏰ {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+                bot.run(TOKEN, log_handler=None, reconnect=True)
+                print("✅ Bot connected and running!")
+                break
+
+            except discord.HTTPException as e:
+                # Cloudflare Error 1015 (rate limit)
+                if e.status == 429 and ("cloudflare" in str(e).lower() or "1015" in str(e)):
+                    wait_time = base_wait * (2 ** retry_count)
+                    wait_time = min(wait_time, 1800)  # Cap at 30 minutes
+
+                    print(f"\n⚠️ Cloudflare blocked connection (Error 1015)")
+                    print(f"⚠️ Waiting {wait_time // 60} minutes before retry...")
+
+                    if retry_count < max_retries - 1:
+                        import time
+
+                        time.sleep(wait_time)
+                        retry_count += 1
+                    else:
+                        print("❌ Max retries reached. IP may be banned for hours.")
+                        break
+
+                # Regular Discord rate limit
+                elif e.status == 429:
+                    print(f"⚠️ Discord API rate limit")
+                    import time
+
+                    time.sleep(300)
+                    retry_count += 1
+
+                else:
+                    print(f"❌ HTTP Error {e.status}: {e}")
+                    raise
+
+            except discord.LoginFailure:
+                print("❌ Invalid token!")
+                break
+
+            except Exception as e:
+                print(f"❌ Unexpected error: {e}")
+                import traceback
+
+                traceback.print_exc()
+                break
 
     print("=== BOT EXITED ===")
