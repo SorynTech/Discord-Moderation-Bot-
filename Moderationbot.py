@@ -10,7 +10,7 @@ print("STEP 1: Script file loaded", flush=True)
 print("="*60, flush=True)
 
 print("STEP 2: Importing standard libraries...", flush=True)
-from datetime import datetime
+from datetime import datetime, timedelta
 print(f"  ✓ datetime imported at {datetime.now()}", flush=True)
 
 print("STEP 3: Checking environment...", flush=True)
@@ -652,7 +652,7 @@ async def health_check(request):
         return web.Response(text=html, content_type='text/html', status=503)
 
     # Normal status (bot is running)
-    uptime = datetime.datetime.now() - bot_start_time
+    uptime = datetime.now() - bot_start_time
     hours, remainder = divmod(int(uptime.total_seconds()), 3600)
     minutes, seconds = divmod(remainder, 60)
     html = f"""
