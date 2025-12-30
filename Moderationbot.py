@@ -22,10 +22,6 @@ bot_owner_sleeping = False
 # End Initalization
 
 
-# Set up logging to see rate limit info
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
 
 # Create handler
 handler = logging.StreamHandler()
@@ -2196,6 +2192,7 @@ if __name__ == "__main__":
             bot.run(TOKEN, log_handler=None)  # Use our custom logging
         except Exception as e:
             print(f"BOT CRASHED: {e}")
+            import traceback
             import traceback
 
             traceback.print_exc()
