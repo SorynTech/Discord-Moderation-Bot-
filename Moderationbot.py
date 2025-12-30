@@ -1,8 +1,45 @@
+import sys
 import os
-import discord
+
+# Force unbuffered output - CRITICAL for seeing logs on Render
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', buffering=1)
+
+print("="*60, flush=True)
+print("STEP 1: Script file loaded", flush=True)
+print("="*60, flush=True)
+
+print("STEP 2: Importing standard libraries...", flush=True)
+from datetime import datetime
+print(f"  ✓ datetime imported at {datetime.now()}", flush=True)
+
+print("STEP 3: Checking environment...", flush=True)
+print(f"  Python: {sys.version.split()[0]}", flush=True)
+print(f"  Directory: {os.getcwd()}", flush=True)
+print(f"  DISCORD_TOKEN exists: {bool(os.getenv('DISCORD_TOKEN'))}", flush=True)
+
+print("STEP 4: Importing discord.py (this may take 10-30 seconds)...", flush=True)
+try:
+    import discord
+    print(f"  ✓ discord.py {discord.__version__} imported", flush=True)
+except Exception as e:
+    print(f"  ✗ FAILED to import discord.py: {e}", flush=True)
+    sys.exit(1)
+
+print("STEP 5: Importing other dependencies...", flush=True)
+# Add all your other imports here ONE BY ONE with print statements:
+# import requests
+# print("  ✓ requests imported", flush=True)
+# import asyncio
+# print("  ✓ asyncio imported", flush=True)
+
+print("STEP 6: Starting bot setup...", flush=True)
+
+# NOW your actual bot code starts here
+# ===========================================
+
 from discord import app_commands, Member
 from discord.ext import commands
-import datetime
 import requests
 import random as r
 from aiohttp import web
