@@ -2004,6 +2004,15 @@ async def slash_reason(interaction: discord.Interaction, case_id: int, reason: s
         f"✅ Updated reason for case #{case_id}:\n```{reason}```",
         ephemeral=True
     )
+
+#=====================================================WIP (INFO)=====================================================
+
+#@bot.tree.command(name="member-count",description="Display server member statistics")
+#async def slash_member_count(interaction: discord.Interaction):
+    #print("save indent")
+#@bot.tree.command(name="bot-info", description="Display bot statistics and information")
+#async def slash_bot_info(interaction: discord.Interaction):
+    #print("Save indent")
 # ===============WIP ROLE MANAGMENT================================================================================
 @bot.tree.command(name="addrole", description="Add a role to a user")
 async def slash_addrole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
