@@ -39,13 +39,14 @@ print(f"Has quotes: {has_quotes}")
 if TOKEN:
     try:
         response = requests.get('https://discord.com/api/v10/users/@me',
-                                headers={'Authorization': f'Bot {TOKEN}'})
+                                headers={'Authorization': f'Bot {TOKEN}'},
+                                timeout=10)
         if response.status_code == 200:
             bot_data = response.json()
             print(f"\nBot: {bot_data['username']} (ID: {bot_data['id']})")
         else:
             print(f"\n⚠️  Could not fetch bot info: {response.status_code}")
-    except Exception as e:
+    except requests.RequestException as e:
         print(f"\n⚠️  Error fetching bot info: {e}")
 
 print("==================")
