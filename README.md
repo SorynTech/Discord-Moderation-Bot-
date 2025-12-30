@@ -74,10 +74,10 @@ A utility script for troubleshooting Discord token issues without logging into t
 - 🆔 Displays bot's Discord User ID
 
 - ⚠️ **RUN THIS FILE LOCALLY NOT ON YOUR PRODUCTION SERVER TO PREVENT LEAKING SECRETS TO PEOPLE OUTSIDE BOT DEVELOPMENT**
-```
+
 
 **Example Output**:
-```
+
 === TOKEN DEBUG ===
 Token exists: True
 Token length: 72
