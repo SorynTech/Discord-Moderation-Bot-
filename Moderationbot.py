@@ -241,7 +241,7 @@ async def health_check(request):
                 <div class="info-message">
                     🔴 The bot has gone into the deep. Emergency shutdown activated. Please check back later.
                 </div>
-                <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
                 </a>
             </div>
@@ -442,7 +442,7 @@ async def health_check(request):
                         <span class="info-value">{round(bot.latency * 1000)}ms</span>
                     </div>
                 </div>
-                <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
                 </a>
             </div>
@@ -594,7 +594,7 @@ async def health_check(request):
                 <div class="info-message">
                     ⚠️ The shark is performing maintenance in the deep. Check back in a few minutes.
                 </div>
-                <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+                <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
                 </a>
             </div>
@@ -794,7 +794,7 @@ async def health_check(request):
                     <span class="info-value">{round(bot.latency * 1000)}ms</span>
                 </div>
             </div>
-            <a href="https://github.com/soryntech/discord-moderation-bot" target="_blank" class="github-button">
+            <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                 🔗 View on GitHub
             </a>
         </div>
