@@ -43,22 +43,7 @@ import asyncio
 bot_start_time = None
 if bot_start_time is None:
     bot_start_time = datetime.now()
- try:
-        print("Attempting to sync commands...", flush=True)
-        synced = await bot.tree.sync()
-        print(f"✅ Successfully synced {len(synced)} command(s)", flush=True)
-    except discord.Forbidden as e:
-        print(f"❌ Failed to sync commands (insufficient permissions): {e}", flush=True)
-    except discord.HTTPException as e:
-        print(f"❌ Failed to sync commands (HTTP error): {e}", flush=True)
-        print(f"Status: {e.status}", flush=True)
-        print(f"Response: {e.text}", flush=True)
-    except Exception as e:
-        print(f"❌ Failed to sync commands (unexpected error): {e}", flush=True)
-        import traceback
-        traceback.print_exc()
 
-    # FIXED: Only sync commands once to prevent rate limiting
 # Track update status
 bot_updating = False
 # Track emergency shutdown status
@@ -73,7 +58,7 @@ commands_synced = False
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.presences = True
+intents.presences = True  # Add this line
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 
@@ -150,6 +135,7 @@ async def setup_hook():
 
 async def health_check(request):
     global bot_updating, bot_emergency_shutdown, bot_owner_sleeping
+    # Add this line at the top
 
     if bot_start_time is None:
         return web.Response(
@@ -1164,6 +1150,16 @@ async def check_emergency_shutdown(interaction: discord.Interaction) -> bool:
         return False
 
     return True
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.")
+    elif isinstance(error, discord.HTTPException):
+        if error.status == 429:
+            print(f"⚠️ Rate limited! Response: {error.text}")
+            await ctx.send("⚠️ Bot is being rate limited. Please wait a moment.")
 
 
 @bot.event
