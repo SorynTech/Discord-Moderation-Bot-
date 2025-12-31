@@ -1,16 +1,18 @@
 import sys
 import os
+import base64
 
 # Force unbuffered output - CRITICAL for seeing logs on Render
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
 sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', buffering=1)
 
-print("="*60, flush=True)
+print("=" * 60, flush=True)
 print("STEP 1: Script file loaded", flush=True)
-print("="*60, flush=True)
+print("=" * 60, flush=True)
 
 print("STEP 2: Importing standard libraries...", flush=True)
 from datetime import datetime, timedelta
+
 print(f"  ✓ datetime imported at {datetime.now()}", flush=True)
 
 print("STEP 3: Checking environment...", flush=True)
@@ -21,22 +23,13 @@ print(f"  DISCORD_TOKEN exists: {bool(os.getenv('DISCORD_TOKEN'))}", flush=True)
 print("STEP 4: Importing discord.py (this may take 10-30 seconds)...", flush=True)
 try:
     import discord
+
     print(f"  ✓ discord.py {discord.__version__} imported", flush=True)
 except Exception as e:
     print(f"  ✗ FAILED to import discord.py: {e}", flush=True)
     sys.exit(1)
 
 print("STEP 5: Importing other dependencies...", flush=True)
-# Add all your other imports here ONE BY ONE with print statements:
-# import requests
-# print("  ✓ requests imported", flush=True)
-# import asyncio
-# print("  ✓ asyncio imported", flush=True)
-
-print("STEP 6: Starting bot setup...", flush=True)
-
-# NOW your actual bot code starts here
-# ===========================================
 
 from discord import app_commands, Member
 from discord.ext import commands
@@ -50,7 +43,22 @@ import asyncio
 bot_start_time = None
 if bot_start_time is None:
     bot_start_time = datetime.now()
+ try:
+        print("Attempting to sync commands...", flush=True)
+        synced = await bot.tree.sync()
+        print(f"✅ Successfully synced {len(synced)} command(s)", flush=True)
+    except discord.Forbidden as e:
+        print(f"❌ Failed to sync commands (insufficient permissions): {e}", flush=True)
+    except discord.HTTPException as e:
+        print(f"❌ Failed to sync commands (HTTP error): {e}", flush=True)
+        print(f"Status: {e.status}", flush=True)
+        print(f"Response: {e.text}", flush=True)
+    except Exception as e:
+        print(f"❌ Failed to sync commands (unexpected error): {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
+    # FIXED: Only sync commands once to prevent rate limiting
 # Track update status
 bot_updating = False
 # Track emergency shutdown status
@@ -65,7 +73,7 @@ commands_synced = False
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.presences = True  # Add this line
+intents.presences = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 
@@ -90,6 +98,8 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 CLIENT = os.getenv('DISCORD_CLIENT_ID')
 URL = os.getenv('DISCORD_BOT_URL')
 PORT = os.getenv('PORT', 10000)
+STATS_USER = os.getenv('STATS_USER', 'admin')
+STATS_PASS = os.getenv('STATS_PASS', 'changeme')
 
 if TOKEN:
     print("Token Found")
@@ -106,15 +116,40 @@ else:
     print("URL not found")
 
 
+def check_auth(request):
+    """Check if the request has valid basic auth credentials"""
+    auth_header = request.headers.get('Authorization', '')
+
+    if not auth_header.startswith('Basic '):
+        return False
+
+    try:
+        encoded = auth_header[6:]
+        decoded = base64.b64decode(encoded).decode('utf-8')
+        username, password = decoded.split(':', 1)
+        return username == STATS_USER and password == STATS_PASS
+    except:
+        return False
+
+
+def require_auth_response():
+    """Return a 401 response requiring authentication"""
+    return web.Response(
+        text='Authentication Required',
+        status=401,
+        headers={'WWW-Authenticate': 'Basic realm="Stats Access"'}
+    )
+
+
 @bot.event
 async def setup_hook():
     """Runs before bot connects - starts web server immediately"""
     print(f"[{datetime.now()}] Running setup_hook...", flush=True)
     await start_web_server()
 
+
 async def health_check(request):
     global bot_updating, bot_emergency_shutdown, bot_owner_sleeping
-    # Add this line at the top
 
     if bot_start_time is None:
         return web.Response(
@@ -289,6 +324,10 @@ async def health_check(request):
                 <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
                 </a>
+                <a href="https://stats.uptimerobot.com/EfwZKYIE1Q" target="_blank" class="github-button" style="margin-top: 10px;">
+                    📊 Uptime Robot Status
+                </a>
+                <p style="margin-top: 20px; font-size: 0.85em; color: #7eb8d6;">🦈 SorynTech Bot Suite</p>
             </div>
         </body>
         </html>
@@ -490,6 +529,10 @@ async def health_check(request):
                 <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
                 </a>
+                <a href="https://stats.uptimerobot.com/EfwZKYIE1Q" target="_blank" class="github-button" style="margin-top: 10px;">
+                    📊 Uptime Robot Status
+                </a>
+                <p style="margin-top: 20px; font-size: 0.85em; color: #7eb8d6;">🦈 SorynTech Bot Suite</p>
             </div>
         </body>
         </html>
@@ -642,6 +685,10 @@ async def health_check(request):
                 <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
                 </a>
+                <a href="https://stats.uptimerobot.com/EfwZKYIE1Q" target="_blank" class="github-button" style="margin-top: 10px;">
+                    📊 Uptime Robot Status
+                </a>
+                <p style="margin-top: 20px; font-size: 0.85em; color: #7eb8d6;">🦈 SorynTech Bot Suite</p>
             </div>
         </body>
         </html>
@@ -842,6 +889,209 @@ async def health_check(request):
             <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                 🔗 View on GitHub
             </a>
+            <a href="https://stats.uptimerobot.com/EfwZKYIE1Q" target="_blank" class="github-button" style="margin-top: 10px;">
+                📊 Uptime Robot Status
+            </a>
+            <p style="margin-top: 20px; font-size: 0.85em; color: #7eb8d6;">🦈 SorynTech Bot Suite</p>
+        </div>
+    </body>
+    </html>
+    """
+    return web.Response(text=html, content_type='text/html')
+
+
+async def stats_page(request):
+    """Password-protected detailed stats page"""
+    # Check authentication
+    if not check_auth(request):
+        return require_auth_response()
+
+    # Calculate uptime
+    uptime = datetime.now() - bot_start_time
+    days = uptime.days
+    hours, remainder = divmod(uptime.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Get guild list
+    guild_list = "\n".join([f"                <li>{guild.name} ({guild.member_count} members)</li>"
+                            for guild in bot.guilds])
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>SorynTech Bot Statistics</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="refresh" content="30">
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(180deg, #003366 0%, #006699 50%, #003366 100%);
+                min-height: 100vh;
+                padding: 20px;
+                color: #e0f7ff;
+            }}
+            .container {{
+                max-width: 1200px;
+                margin: 0 auto;
+            }}
+            .header {{
+                text-align: center;
+                padding: 40px 20px;
+                background: rgba(0, 60, 100, 0.9);
+                border-radius: 20px;
+                margin-bottom: 30px;
+                border: 2px solid rgba(0, 200, 255, 0.3);
+            }}
+            h1 {{
+                font-size: 2.5em;
+                margin-bottom: 10px;
+                text-shadow: 0 0 10px rgba(0, 200, 255, 0.5);
+            }}
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 20px;
+                margin-bottom: 30px;
+            }}
+            .stat-card {{
+                background: rgba(0, 60, 100, 0.9);
+                border-radius: 15px;
+                padding: 25px;
+                border: 2px solid rgba(0, 200, 255, 0.3);
+            }}
+            .stat-card h2 {{
+                color: #00ddff;
+                margin-bottom: 15px;
+                font-size: 1.3em;
+            }}
+            .stat-item {{
+                display: flex;
+                justify-content: space-between;
+                padding: 10px 0;
+                border-bottom: 1px solid rgba(0, 200, 255, 0.1);
+            }}
+            .stat-item:last-child {{
+                border-bottom: none;
+            }}
+            .stat-label {{
+                color: #7eb8d6;
+            }}
+            .stat-value {{
+                color: #00ff88;
+                font-weight: bold;
+            }}
+            .guild-list {{
+                background: rgba(0, 60, 100, 0.9);
+                border-radius: 15px;
+                padding: 25px;
+                border: 2px solid rgba(0, 200, 255, 0.3);
+            }}
+            .guild-list h2 {{
+                color: #00ddff;
+                margin-bottom: 15px;
+            }}
+            .guild-list ul {{
+                list-style-position: inside;
+                color: #7eb8d6;
+            }}
+            .guild-list li {{
+                padding: 8px 0;
+                border-bottom: 1px solid rgba(0, 200, 255, 0.1);
+            }}
+            .footer {{
+                text-align: center;
+                margin-top: 30px;
+                padding: 20px;
+                color: #7eb8d6;
+            }}
+            .refresh-note {{
+                background: rgba(0, 100, 150, 0.3);
+                padding: 10px;
+                border-radius: 8px;
+                display: inline-block;
+                margin-top: 10px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🦈 SorynTech Bot Statistics</h1>
+                <p>Detailed Bot Analytics & Monitoring</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h2>📊 General Stats</h2>
+                    <div class="stat-item">
+                        <span class="stat-label">Bot Name</span>
+                        <span class="stat-value">{bot.user.name if bot.user else "Loading..."}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Bot ID</span>
+                        <span class="stat-value">{bot.user.id if bot.user else "Loading..."}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Guilds</span>
+                        <span class="stat-value">{len(bot.guilds)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Users</span>
+                        <span class="stat-value">{sum(g.member_count for g in bot.guilds)}</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <h2>⏱️ Uptime & Performance</h2>
+                    <div class="stat-item">
+                        <span class="stat-label">Uptime</span>
+                        <span class="stat-value">{days}d {hours}h {minutes}m {seconds}s</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Latency</span>
+                        <span class="stat-value">{round(bot.latency * 1000)}ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Started At</span>
+                        <span class="stat-value">{bot_start_time.strftime('%Y-%m-%d %H:%M UTC')}</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <h2>🔧 Bot Status</h2>
+                    <div class="stat-item">
+                        <span class="stat-label">Emergency Shutdown</span>
+                        <span class="stat-value">{'🔴 Active' if bot_emergency_shutdown else '🟢 Normal'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Update Mode</span>
+                        <span class="stat-value">{'🟡 Active' if bot_updating else '🟢 Normal'}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Owner Sleep Mode</span>
+                        <span class="stat-value">{'😴 Active' if bot_owner_sleeping else '🟢 Awake'}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="guild-list">
+                <h2>🏝️ Connected Servers ({len(bot.guilds)})</h2>
+                <ul>
+{guild_list}
+                </ul>
+            </div>
+
+            <div class="footer">
+                <p>🦈 SorynTech Bot Suite - Shark Moderation Bot</p>
+                <div class="refresh-note">⟳ Auto-refreshing every 30 seconds</div>
+                <p style="margin-top: 10px; font-size: 0.9em;">Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+            </div>
         </div>
     </body>
     </html>
@@ -854,13 +1104,14 @@ async def start_web_server():
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
+    app.router.add_get('/stats', stats_page)
 
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
     print(f'[{datetime.now()}] ✅ Web server started on port {PORT}', flush=True)
-
+    print(f'[{datetime.now()}] 📊 Stats page: http://0.0.0.0:{PORT}/stats (requires auth)', flush=True)
 
 
 @bot.event
@@ -869,22 +1120,6 @@ async def on_ready():
     bot_start_time = datetime.now()
     print(f'[{datetime.now()}] {bot.user} has connected to Discord!', flush=True)
 
-    try:
-        print("Attempting to sync commands...", flush=True)
-        synced = await bot.tree.sync()
-        print(f"✅ Successfully synced {len(synced)} command(s)", flush=True)
-    except discord.Forbidden as e:
-        print(f"❌ Failed to sync commands (insufficient permissions): {e}", flush=True)
-    except discord.HTTPException as e:
-        print(f"❌ Failed to sync commands (HTTP error): {e}", flush=True)
-        print(f"Status: {e.status}", flush=True)
-        print(f"Response: {e.text}", flush=True)
-    except Exception as e:
-        print(f"❌ Failed to sync commands (unexpected error): {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-
-    # FIXED: Only sync commands once to prevent rate limiting
     if not commands_synced:
         try:
             print("Attempting to sync commands...")
@@ -892,11 +1127,10 @@ async def on_ready():
             commands_synced = True
             print(f"✅ Successfully synced {len(synced)} command(s)")
         except discord.HTTPException as e:
-            if e.status == 429:  # Rate limit
+            if e.status == 429:
                 print(f"⚠️ Rate limited when syncing commands. Will retry automatically.")
                 retry_after = e.response.headers.get('Retry-After', 60)
                 print(f"Retry after: {retry_after} seconds")
-                # Don't crash - let Discord.py handle the retry
             else:
                 print(f"❌ Failed to sync commands (HTTP error): {e}")
                 print(f"Status: {e.status}")
@@ -909,26 +1143,19 @@ async def on_ready():
         print("Commands already synced, skipping sync")
 
 
-# CRITICAL FIX: Add on_message handler to prevent bot loops
 @bot.event
 async def on_message(message):
-    # Ignore all bot messages to prevent loops
     if message.author.bot:
         return
-
-    # Process commands
     await bot.process_commands(message)
 
 
-# Command check to block commands during emergency shutdown
 async def check_emergency_shutdown(interaction: discord.Interaction) -> bool:
     global bot_emergency_shutdown
 
-    # Allow owner commands regardless of shutdown status
     if interaction.user.id == 447812883158532106:
         return True
 
-    # Block all commands during emergency shutdown (but NOT during owner sleep)
     if bot_emergency_shutdown:
         await interaction.response.send_message(
             "🔴 **Bot is currently offline due to emergency shutdown.**",
@@ -936,11 +1163,9 @@ async def check_emergency_shutdown(interaction: discord.Interaction) -> bool:
         )
         return False
 
-    # Owner sleep mode does NOT block commands - only changes status page
     return True
 
 
-# CRITICAL: Add rate limit handler
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
@@ -949,7 +1174,6 @@ async def on_command_error(ctx, error):
         if error.status == 429:
             print(f"⚠️ Rate limited! Response: {error.text}")
             await ctx.send("⚠️ Bot is being rate limited. Please wait a moment.")
-
 
 @bot.tree.command(name="kick", description="Kick a member from the server")
 @app_commands.describe(
@@ -2026,6 +2250,8 @@ if __name__ == "__main__":
     print("=== BOT STARTING ===")
     print(f"TOKEN exists: {bool(TOKEN)}")
     print(f"PORT: {PORT}")
+    print(f"STATS_USER: {STATS_USER}")
+    print(f"STATS_PASS: {'***' if STATS_PASS else 'Not Set'}")
 
     if not TOKEN:
         print("ERROR: DISCORD_TOKEN not found in environment variables!")
@@ -2037,7 +2263,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"BOT CRASHED: {e}")
             import traceback
-
             traceback.print_exc()
 
     print("=== BOT EXITED ===")

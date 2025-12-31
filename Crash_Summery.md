@@ -102,11 +102,11 @@ async def on_command_error(ctx, error):
 ## Testing Checklist
 
 After restarting:
-- [ ] Bot connects successfully
-- [ ] Commands work without errors
-- [ ] Lockdown/unlock works without rate limits
-- [ ] No infinite loops in logs
-- [ ] No 429 errors in console
+- [x] Bot connects successfully
+- [x] Commands work without errors
+- [x] Lockdown/unlock works without rate limits
+- [x] No infinite loops in logs
+- [x] No 429 errors in console
 
 ## If You Still Get Rate Limited
 
