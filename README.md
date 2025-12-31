@@ -1,4 +1,5 @@
 # Discord Moderation Bot - SorynTech's Shark Bot 🦈
+### BEING UPDATED PLEASE WAIT FOR NEXT PR
 
 A comprehensive Discord moderation bot with an underwater shark-themed status page and powerful moderation features.
 
