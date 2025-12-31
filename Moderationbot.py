@@ -43,7 +43,22 @@ import asyncio
 bot_start_time = None
 if bot_start_time is None:
     bot_start_time = datetime.now()
+ try:
+        print("Attempting to sync commands...", flush=True)
+        synced = await bot.tree.sync()
+        print(f"✅ Successfully synced {len(synced)} command(s)", flush=True)
+    except discord.Forbidden as e:
+        print(f"❌ Failed to sync commands (insufficient permissions): {e}", flush=True)
+    except discord.HTTPException as e:
+        print(f"❌ Failed to sync commands (HTTP error): {e}", flush=True)
+        print(f"Status: {e.status}", flush=True)
+        print(f"Response: {e.text}", flush=True)
+    except Exception as e:
+        print(f"❌ Failed to sync commands (unexpected error): {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
+    # FIXED: Only sync commands once to prevent rate limiting
 # Track update status
 bot_updating = False
 # Track emergency shutdown status
