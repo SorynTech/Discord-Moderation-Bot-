@@ -2250,6 +2250,8 @@ if __name__ == "__main__":
     print("=== BOT STARTING ===")
     print(f"TOKEN exists: {bool(TOKEN)}")
     print(f"PORT: {PORT}")
+    print(f"STATS_USER: {STATS_USER}")
+    print(f"STATS_PASS: {'***' if STATS_PASS else 'Not Set'}")
 
     if not TOKEN:
         print("ERROR: DISCORD_TOKEN not found in environment variables!")
@@ -2261,7 +2263,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"BOT CRASHED: {e}")
             import traceback
-
             traceback.print_exc()
 
     print("=== BOT EXITED ===")
