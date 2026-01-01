@@ -305,7 +305,7 @@ async def health_check(request):
                 <h1>Shark Bot is <span class="status">Offline</span></h1>
                 <p style="color: #7eb8d6; margin-bottom: 20px;">Shark in the deep waters</p>
                 <div class="info-message">
-                    🔴 The bot has gone into the deep. Emergency shutdown activated. Please check back later.
+                    🔴 The bot has gone into the deep. Please check back later.
                 </div>
                 <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
@@ -666,7 +666,7 @@ async def health_check(request):
                 <h1>Shark Bot is <span class="status">Updating</span></h1>
                 <p style="color: #7eb8d6; margin-bottom: 20px;">Maintenance dive in progress</p>
                 <div class="info-message">
-                    ⚠️ The shark is performing maintenance in the deep. Check back in a few minutes.
+                    ⚠️ SorynTech is performing maintenance on the bot. Check back Later.
                 </div>
                 <a href="https://github.com/soryntech/discord-moderation-bot-" target="_blank" class="github-button">
                     🔗 View on GitHub
@@ -1522,7 +1522,7 @@ async def slash_userinfo(interaction: discord.Interaction, member: discord.Membe
     await interaction.followup.send(embed=embed)
 
 
-@bot.tree.command(name="sdeaf", description="Deafen a user")
+@bot.tree.command(name="server-deafen", description="Deafen a user")
 @app_commands.describe(member="The member to deafen")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
@@ -1574,7 +1574,7 @@ async def slash_deaf(interaction: discord.Interaction, member: discord.Member):
         )
 
 
-@bot.tree.command(name="smute", description="Mute a user")
+@bot.tree.command(name="server-mute", description="Mute a user")
 @app_commands.describe(member="The member to mute")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_servermute(interaction: discord.Interaction, member: discord.Member):
@@ -1621,7 +1621,7 @@ async def slash_servermute(interaction: discord.Interaction, member: discord.Mem
         )
 
 
-@bot.tree.command(name="smuteno", description="Unmute a user from voice")
+@bot.tree.command(name="server-unmute", description="Unmute a user from voice")
 @app_commands.describe(member="The member to unmute")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_unmute_voice(interaction: discord.Interaction, member: discord.Member):
@@ -1673,7 +1673,7 @@ async def slash_unmute_voice(interaction: discord.Interaction, member: discord.M
         )
 
 
-@bot.tree.command(name="sdeafno", description="Undeafen a user from voice")
+@bot.tree.command(name="server-undeafen", description="Undeafen a user from voice")
 @app_commands.describe(member="The member to undeafen")
 @app_commands.checks.has_permissions(send_polls=True)
 async def slash_undeaf_voice(interaction: discord.Interaction, member: discord.Member):
@@ -1878,7 +1878,7 @@ async def slash_owner_sleep(interaction: discord.Interaction):
         )
 
 
-@bot.tree.command(name="updatemode", description="Toggle update mode for the bot status page (Owner Only)")
+@bot.tree.command(name="update-mode", description="Toggle update mode for the bot status page (Owner Only)")
 async def slash_updatemode(interaction: discord.Interaction):
     global bot_updating
 
