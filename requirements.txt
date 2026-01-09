@@ -1,3 +1,7 @@
 discord.py
 aiohttp
 requests
+discord.py
+aiohttp
+requests
+psycopg2
