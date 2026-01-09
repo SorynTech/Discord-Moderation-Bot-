@@ -1635,6 +1635,14 @@ async def on_ready():
     else:
         print("Commands already synced, skipping sync")
 
+    # Initialize moderation database
+    if db_pool is None:
+        print("Initializing moderation database...")
+        init_moderation_database()
+        print("✅ Moderation database initialized")
+    else:
+        print("Database already initialized, skipping initialization")
+
 
 @bot.event
 async def on_message(message):
@@ -3184,6 +3192,7 @@ if __name__ == "__main__":
     print(f"PORT: {PORT}")
     print(f"STATS_USER: {STATS_USER}")
     print(f"STATS_PASS: {'***' if STATS_PASS else 'Not Set'}")
+    print(f"SUPABASE_URL exists: {bool(SUPABASE_URL)}")
 
     if not TOKEN:
         print("ERROR: DISCORD_TOKEN not found in environment variables!")
@@ -3191,10 +3200,34 @@ if __name__ == "__main__":
     else:
         print("Starting bot...")
         try:
+            # Initialize moderation database
+            print("\n" + "=" * 60)
+            print("INITIALIZING MODERATION DATABASE")
+            print("=" * 60)
+
+            database_enabled = init_moderation_database()
+
+            if database_enabled:
+                print("✅ Moderation tracking database ready!")
+                print("📋 Commands available: /case, /warn, /warnings, /clearwarnings, /modnote, /reason")
+            else:
+                print("⚠️  Moderation tracking disabled - bot will work without database features")
+                print("💡 To enable: Add SUPABASE_URL to your .env file")
+
+            print("=" * 60)
+            print("\nStarting Discord bot...")
+            print("=" * 60 + "\n")
+
+            # Start the bot
             bot.run(TOKEN, log_handler=None)
+
         except Exception as e:
             print(f"BOT CRASHED: {e}")
             import traceback
+
             traceback.print_exc()
+        finally:
+            # Clean up database connections
+            close_database()
 
     print("=== BOT EXITED ===")
