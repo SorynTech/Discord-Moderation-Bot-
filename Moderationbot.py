@@ -52,6 +52,513 @@ bot_emergency_shutdown = False
 bot_owner_sleeping = False
 # Track if commands are synced to prevent multiple syncs
 commands_synced = False
+# ============================================================================
+# DATABASE CONFIGURATION AND FUNCTIONS FOR MODERATION BOT
+# ============================================================================
+# PASTE THIS SECTION AFTER THE IMPORTS AND BEFORE THE INTENTS CONFIGURATION
+# (Around line 50-60, after all the import statements)
+# ============================================================================
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from psycopg2.pool import SimpleConnectionPool
+from typing import Optional, List, Dict
+
+# ============================================================================
+# DATABASE CONFIGURATION
+# ============================================================================
+
+# Supabase Database URL (will be loaded from .env)
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+
+# Connection pool for database
+db_pool = None
+
+
+# ============================================================================
+# DATABASE HELPER FUNCTIONS
+# ============================================================================
+
+def get_db_connection():
+    """Get a database connection from the pool"""
+    return db_pool.getconn()
+
+
+def return_db_connection(conn):
+    """Return a connection to the pool"""
+    db_pool.putconn(conn)
+
+
+def init_moderation_database():
+    """Initialize database with moderation tracking tables"""
+    global db_pool
+
+    print("=" * 60)
+    print("🗄️  INITIALIZING MODERATION DATABASE")
+    print("=" * 60)
+
+    if not SUPABASE_URL:
+        print("❌ SUPABASE_URL not found in environment variables!")
+        print("⚠️  Moderation tracking features will be disabled.")
+        print("Add SUPABASE_URL to your .env file to enable moderation tracking.")
+        return False
+
+    try:
+        # Create connection pool
+        print("🔄 Creating database connection pool...")
+        db_pool = SimpleConnectionPool(1, 20, SUPABASE_URL)
+        print("✅ Database connection pool created")
+
+        print("🔌 Testing database connection...")
+        conn = get_db_connection()
+        cur = conn.cursor()
+        print("✅ Database connection successful")
+
+        # Create moderation_cases table
+        print("📋 Creating 'moderation_cases' table...")
+        cur.execute('''CREATE TABLE IF NOT EXISTS moderation_cases
+                       (
+                           case_id
+                           SERIAL
+                           PRIMARY
+                           KEY,
+                           guild_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           user_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           moderator_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           action_type
+                           TEXT
+                           NOT
+                           NULL,
+                           reason
+                           TEXT,
+                           created_at
+                           TIMESTAMP
+                           WITH
+                           TIME
+                           ZONE
+                           DEFAULT
+                           CURRENT_TIMESTAMP,
+                           updated_at
+                           TIMESTAMP
+                           WITH
+                           TIME
+                           ZONE
+                           DEFAULT
+                           CURRENT_TIMESTAMP
+                       )''')
+        print("✅ 'moderation_cases' table ready")
+
+        # Create moderation_warnings table
+        print("📋 Creating 'moderation_warnings' table...")
+        cur.execute('''CREATE TABLE IF NOT EXISTS moderation_warnings
+                       (
+                           warning_id
+                           SERIAL
+                           PRIMARY
+                           KEY,
+                           guild_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           user_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           moderator_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           reason
+                           TEXT
+                           NOT
+                           NULL,
+                           created_at
+                           TIMESTAMP
+                           WITH
+                           TIME
+                           ZONE
+                           DEFAULT
+                           CURRENT_TIMESTAMP
+                       )''')
+        print("✅ 'moderation_warnings' table ready")
+
+        # Create moderation_notes table
+        print("📋 Creating 'moderation_notes' table...")
+        cur.execute('''CREATE TABLE IF NOT EXISTS moderation_notes
+                       (
+                           note_id
+                           SERIAL
+                           PRIMARY
+                           KEY,
+                           guild_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           user_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           moderator_id
+                           BIGINT
+                           NOT
+                           NULL,
+                           note_text
+                           TEXT
+                           NOT
+                           NULL,
+                           created_at
+                           TIMESTAMP
+                           WITH
+                           TIME
+                           ZONE
+                           DEFAULT
+                           CURRENT_TIMESTAMP
+                       )''')
+        print("✅ 'moderation_notes' table ready")
+
+        # Create indexes for better performance
+        print("📊 Creating database indexes...")
+        cur.execute('''CREATE INDEX IF NOT EXISTS idx_mod_cases_guild_user
+            ON moderation_cases(guild_id, user_id)''')
+        cur.execute('''CREATE INDEX IF NOT EXISTS idx_mod_cases_created
+            ON moderation_cases(created_at)''')
+        cur.execute('''CREATE INDEX IF NOT EXISTS idx_mod_warnings_guild_user
+            ON moderation_warnings(guild_id, user_id)''')
+        cur.execute('''CREATE INDEX IF NOT EXISTS idx_mod_notes_guild_user
+            ON moderation_notes(guild_id, user_id)''')
+        print("✅ All indexes created")
+
+        conn.commit()
+        print("✅ Database changes committed")
+        cur.close()
+        return_db_connection(conn)
+
+        print("=" * 60)
+        print("✅ MODERATION DATABASE INITIALIZED SUCCESSFULLY")
+        print("=" * 60)
+        return True
+
+    except Exception as e:
+        print(f"❌ Database initialization error: {e}")
+        print("⚠️  Moderation tracking features will be disabled.")
+        return False
+
+
+# ============================================================================
+# MODERATION CASE FUNCTIONS
+# ============================================================================
+
+def create_mod_case(guild_id: int, user_id: int, moderator_id: int,
+                    action_type: str, reason: str = None) -> Optional[int]:
+    """
+    Create a new moderation case
+
+    Args:
+        guild_id: Discord guild ID
+        user_id: Target user ID
+        moderator_id: Moderator user ID
+        action_type: Type of action (kick, ban, mute, etc.)
+        reason: Reason for the action
+
+    Returns:
+        case_id if successful, None otherwise
+    """
+    if db_pool is None:
+        return None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''INSERT INTO moderation_cases
+                           (guild_id, user_id, moderator_id, action_type, reason)
+                       VALUES (%s, %s, %s, %s, %s) RETURNING case_id''',
+                    (guild_id, user_id, moderator_id, action_type, reason))
+
+        case_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return_db_connection(conn)
+
+        print(f"✅ Created moderation case #{case_id} for user {user_id}")
+        return case_id
+
+    except Exception as e:
+        print(f"❌ Error creating mod case: {e}")
+        if conn:
+            conn.rollback()
+            return_db_connection(conn)
+        return None
+
+
+def get_mod_case(case_id: int, guild_id: int) -> Optional[Dict]:
+    """Get details of a specific moderation case"""
+    if db_pool is None:
+        return None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute('''SELECT *
+                       FROM moderation_cases
+                       WHERE case_id = %s
+                         AND guild_id = %s''',
+                    (case_id, guild_id))
+
+        result = cur.fetchone()
+        cur.close()
+        return_db_connection(conn)
+
+        return dict(result) if result else None
+
+    except Exception as e:
+        print(f"❌ Error getting mod case: {e}")
+        return None
+
+
+def update_mod_case_reason(case_id: int, guild_id: int, new_reason: str) -> bool:
+    """Update the reason for a moderation case"""
+    if db_pool is None:
+        return False
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''UPDATE moderation_cases
+                       SET reason     = %s,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE case_id = %s
+                         AND guild_id = %s''',
+                    (new_reason, case_id, guild_id))
+
+        rows_affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        return_db_connection(conn)
+
+        return rows_affected > 0
+
+    except Exception as e:
+        print(f"❌ Error updating mod case: {e}")
+        if conn:
+            conn.rollback()
+            return_db_connection(conn)
+        return False
+
+
+def get_user_mod_cases(guild_id: int, user_id: int, limit: int = 10) -> List[Dict]:
+    """Get moderation cases for a specific user"""
+    if db_pool is None:
+        return []
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute('''SELECT *
+                       FROM moderation_cases
+                       WHERE guild_id = %s
+                         AND user_id = %s
+                       ORDER BY created_at DESC
+                           LIMIT %s''',
+                    (guild_id, user_id, limit))
+
+        rows = cur.fetchall()
+        cur.close()
+        return_db_connection(conn)
+
+        return [dict(row) for row in rows]
+
+    except Exception as e:
+        print(f"❌ Error getting user mod cases: {e}")
+        return []
+
+
+# ============================================================================
+# WARNING FUNCTIONS
+# ============================================================================
+
+def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str) -> Optional[int]:
+    """Add a warning to a user"""
+    if db_pool is None:
+        return None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''INSERT INTO moderation_warnings
+                           (guild_id, user_id, moderator_id, reason)
+                       VALUES (%s, %s, %s, %s) RETURNING warning_id''',
+                    (guild_id, user_id, moderator_id, reason))
+
+        warning_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return_db_connection(conn)
+
+        print(f"✅ Added warning #{warning_id} to user {user_id}")
+        return warning_id
+
+    except Exception as e:
+        print(f"❌ Error adding warning: {e}")
+        if conn:
+            conn.rollback()
+            return_db_connection(conn)
+        return None
+
+
+def get_user_warnings(guild_id: int, user_id: int) -> List[Dict]:
+    """Get all warnings for a specific user"""
+    if db_pool is None:
+        return []
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute('''SELECT *
+                       FROM moderation_warnings
+                       WHERE guild_id = %s
+                         AND user_id = %s
+                       ORDER BY created_at DESC''',
+                    (guild_id, user_id))
+
+        rows = cur.fetchall()
+        cur.close()
+        return_db_connection(conn)
+
+        return [dict(row) for row in rows]
+
+    except Exception as e:
+        print(f"❌ Error getting warnings: {e}")
+        return []
+
+
+def clear_user_warnings(guild_id: int, user_id: int) -> int:
+    """Clear all warnings for a user, returns number of warnings cleared"""
+    if db_pool is None:
+        return 0
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''DELETE
+                       FROM moderation_warnings
+                       WHERE guild_id = %s
+                         AND user_id = %s''',
+                    (guild_id, user_id))
+
+        deleted_count = cur.rowcount
+        conn.commit()
+        cur.close()
+        return_db_connection(conn)
+
+        print(f"✅ Cleared {deleted_count} warning(s) for user {user_id}")
+        return deleted_count
+
+    except Exception as e:
+        print(f"❌ Error clearing warnings: {e}")
+        if conn:
+            conn.rollback()
+            return_db_connection(conn)
+        return 0
+
+
+# ============================================================================
+# MODERATION NOTE FUNCTIONS
+# ============================================================================
+
+def add_mod_note(guild_id: int, user_id: int, moderator_id: int, note_text: str) -> Optional[int]:
+    """Add a moderation note (visible only to moderators)"""
+    if db_pool is None:
+        return None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''INSERT INTO moderation_notes
+                           (guild_id, user_id, moderator_id, note_text)
+                       VALUES (%s, %s, %s, %s) RETURNING note_id''',
+                    (guild_id, user_id, moderator_id, note_text))
+
+        note_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return_db_connection(conn)
+
+        print(f"✅ Added mod note #{note_id} for user {user_id}")
+        return note_id
+
+    except Exception as e:
+        print(f"❌ Error adding mod note: {e}")
+        if conn:
+            conn.rollback()
+            return_db_connection(conn)
+        return None
+
+
+def get_user_mod_notes(guild_id: int, user_id: int) -> List[Dict]:
+    """Get all moderation notes for a specific user"""
+    if db_pool is None:
+        return []
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute('''SELECT *
+                       FROM moderation_notes
+                       WHERE guild_id = %s
+                         AND user_id = %s
+                       ORDER BY created_at DESC''',
+                    (guild_id, user_id))
+
+        rows = cur.fetchall()
+        cur.close()
+        return_db_connection(conn)
+
+        return [dict(row) for row in rows]
+
+    except Exception as e:
+        print(f"❌ Error getting mod notes: {e}")
+        return []
+
+
+# ============================================================================
+# CLEANUP FUNCTION
+# ============================================================================
+
+def close_database():
+    """Close all database connections"""
+    global db_pool
+    if db_pool:
+        print("🔌 Closing database connection pool...")
+        db_pool.closeall()
+        print("✅ Database connections closed")
+
+
+# ============================================================================
+# END OF DATABASE FUNCTIONS
+# ============================================================================
+# Remember to:
+# 1. Add SUPABASE_URL to your .env file
+# 2. Call init_moderation_database() in the on_ready event
+# 3. Call close_database() in the finally block of __main__
+# ============================================================================
 # End Initalization
 
 
@@ -1198,8 +1705,11 @@ async def slash_kick(interaction: discord.Interaction, member: discord.Member, r
 
     await member.kick(reason=reason)
     await interaction.followup.send(
-        f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}"
-    )
+        f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}")
+
+    # Database integration for kick command
+    if db_pool:
+        create_mod_case(interaction.guild.id, member.id, interaction.user.id, "kick", reason)
 
 
 @bot.tree.command(name="ban", description="Ban a member from the server")
@@ -1231,6 +1741,10 @@ async def slash_ban(interaction: discord.Interaction, member: discord.Member, re
         f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}"
     )
 
+    # Database integration for ban command
+    if db_pool:
+        create_mod_case(interaction.guild.id, member.id, interaction.user.id, "ban", reason)
+
 
 @bot.tree.command(name="unban", description="Unban a user from the server")
 @app_commands.describe(
@@ -1252,6 +1766,11 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
         user = await bot.fetch_user(int(user_id))
         await interaction.guild.unban(user)
         await interaction.followup.send(f"✅ {user.mention} has been unbanned.")
+
+        # Database integration for unban command
+        if db_pool:
+            create_mod_case(interaction.guild.id, int(user_id), interaction.user.id, "unban", "User unbanned")
+
     except discord.NotFound:
         await interaction.followup.send("❌ User not found or not banned.", ephemeral=True)
     except discord.Forbidden:
@@ -1291,6 +1810,10 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
         f"✅ {member.mention} has been muted for {duration} seconds. Reason: {reason or 'No reason provided'}"
     )
 
+    # Database integration for mute/timeout command
+    if db_pool:
+        create_mod_case(interaction.guild.id, member.id, interaction.user.id, "timeout", reason)
+
 
 @bot.tree.command(name="unmute", description="Unmute a member")
 @app_commands.describe(member="The member to unmute")
@@ -1325,6 +1848,12 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
         await interaction.followup.send(
             f"✅ Successfully unmuted {member.mention}!"
         )
+
+        # Database integration for unmute command
+        if db_pool:
+            create_mod_case(interaction.guild.id, member.id, interaction.user.id, "unmute",
+                            f"Unmuted by {interaction.user}")
+
     except discord.Forbidden:
         await interaction.followup.send(
             "❌ I don't have permission to unmute this member!",
@@ -1335,7 +1864,6 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
             f"❌ An error occurred: {e}",
             ephemeral=True
         )
-
 
 @bot.tree.command(name="dc", description="Disconnect a user from voice")
 @app_commands.describe(member="Member to disconnect")
@@ -2132,6 +2660,414 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
 
     await interaction.response.send_message(embed=embed)
 
+
+# ============================================================================
+# MODERATION TRACKING COMMANDS
+# ============================================================================
+# PASTE THIS SECTION BEFORE THE ERROR HANDLERS
+# (Before the @slash_ban.error and other error handlers section)
+# ============================================================================
+
+@bot.tree.command(name="case", description="View details of a specific moderation case")
+@app_commands.describe(case_id="The case ID number to look up")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_case(interaction: discord.Interaction, case_id: int):
+    """View details of a moderation case"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    # Get the case from database
+    case = get_mod_case(case_id, interaction.guild.id)
+
+    if not case:
+        await interaction.followup.send(
+            f"❌ Case #{case_id} not found in this server.",
+            ephemeral=True
+        )
+        return
+
+    # Try to fetch user and moderator
+    try:
+        target_user = await bot.fetch_user(case['user_id'])
+        target_name = f"{target_user.name} ({target_user.mention})"
+    except:
+        target_name = f"Unknown User (ID: {case['user_id']})"
+
+    try:
+        moderator = await bot.fetch_user(case['moderator_id'])
+        mod_name = f"{moderator.name} ({moderator.mention})"
+    except:
+        mod_name = f"Unknown Moderator (ID: {case['moderator_id']})"
+
+    # Create embed
+    embed = discord.Embed(
+        title=f"📋 Moderation Case #{case_id}",
+        color=discord.Color.blue(),
+        timestamp=case['created_at']
+    )
+
+    embed.add_field(name="Action Type", value=f"**{case['action_type'].title()}**", inline=True)
+    embed.add_field(name="Target User", value=target_name, inline=True)
+    embed.add_field(name="Moderator", value=mod_name, inline=False)
+
+    reason = case.get('reason') or "No reason provided"
+    embed.add_field(name="Reason", value=reason, inline=False)
+
+    if case.get('updated_at') and case['updated_at'] != case['created_at']:
+        embed.add_field(
+            name="Last Updated",
+            value=f"<t:{int(case['updated_at'].timestamp())}:F>",
+            inline=False
+        )
+
+    embed.set_footer(text=f"Case ID: {case_id} | Created")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="warn", description="Issue a warning to a user")
+@app_commands.describe(
+    member="The member to warn",
+    reason="Reason for the warning"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_warn(interaction: discord.Interaction, member: discord.Member, reason: str):
+    """Issue a warning to a user"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    # Add warning to database
+    warning_id = add_warning(
+        interaction.guild.id,
+        member.id,
+        interaction.user.id,
+        reason
+    )
+
+    if warning_id is None:
+        await interaction.followup.send(
+            "❌ Failed to add warning to database.",
+            ephemeral=True
+        )
+        return
+
+    # Create moderation case
+    case_id = create_mod_case(
+        interaction.guild.id,
+        member.id,
+        interaction.user.id,
+        "warning",
+        reason
+    )
+
+    # Get total warnings for user
+    warnings = get_user_warnings(interaction.guild.id, member.id)
+    warning_count = len(warnings)
+
+    # Create embed
+    embed = discord.Embed(
+        title="⚠️ Warning Issued",
+        color=discord.Color.orange(),
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name="User", value=member.mention, inline=True)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Warning Count", value=f"**{warning_count}**", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+
+    if case_id:
+        embed.set_footer(text=f"Warning ID: {warning_id} | Case ID: {case_id}")
+    else:
+        embed.set_footer(text=f"Warning ID: {warning_id}")
+
+    await interaction.followup.send(embed=embed)
+
+    # Try to DM the user
+    try:
+        dm_embed = discord.Embed(
+            title=f"⚠️ Warning in {interaction.guild.name}",
+            description=f"You have been warned by a moderator.",
+            color=discord.Color.orange()
+        )
+        dm_embed.add_field(name="Reason", value=reason, inline=False)
+        dm_embed.add_field(name="Total Warnings", value=f"**{warning_count}**", inline=False)
+        dm_embed.set_footer(text="Please review the server rules to avoid further action.")
+
+        await member.send(embed=dm_embed)
+    except discord.Forbidden:
+        await interaction.followup.send(
+            f"⚠️ Could not DM {member.mention} about the warning.",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="warnings", description="View warnings for a specific user")
+@app_commands.describe(member="The member to check warnings for")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_warnings(interaction: discord.Interaction, member: discord.Member):
+    """View all warnings for a user"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    warnings = get_user_warnings(interaction.guild.id, member.id)
+
+    if not warnings:
+        await interaction.followup.send(
+            f"✅ {member.mention} has no warnings on record.",
+            ephemeral=True
+        )
+        return
+
+    embed = discord.Embed(
+        title=f"⚠️ Warnings for {member.name}",
+        description=f"Total Warnings: **{len(warnings)}**",
+        color=discord.Color.orange(),
+        timestamp=datetime.now()
+    )
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+
+    # Display up to 10 most recent warnings
+    for i, warning in enumerate(warnings[:10], 1):
+        try:
+            moderator = await bot.fetch_user(warning['moderator_id'])
+            mod_name = moderator.name
+        except:
+            mod_name = f"Unknown (ID: {warning['moderator_id']})"
+
+        warning_date = warning['created_at'].strftime('%Y-%m-%d %H:%M UTC')
+
+        embed.add_field(
+            name=f"Warning #{warning['warning_id']}",
+            value=f"**Moderator:** {mod_name}\n**Date:** {warning_date}\n**Reason:** {warning['reason']}",
+            inline=False
+        )
+
+    if len(warnings) > 10:
+        embed.set_footer(text=f"Showing 10 of {len(warnings)} warnings")
+    else:
+        embed.set_footer(text=f"User ID: {member.id}")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="clearwarnings", description="Clear all warnings for a user")
+@app_commands.describe(member="The member to clear warnings for")
+@app_commands.checks.has_permissions(administrator=True)
+async def slash_clearwarnings(interaction: discord.Interaction, member: discord.Member):
+    """Clear all warnings for a user (Administrator only)"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    # Get current warning count before clearing
+    warnings = get_user_warnings(interaction.guild.id, member.id)
+    warning_count = len(warnings)
+
+    if warning_count == 0:
+        await interaction.followup.send(
+            f"ℹ️ {member.mention} has no warnings to clear.",
+            ephemeral=True
+        )
+        return
+
+    # Clear warnings
+    cleared = clear_user_warnings(interaction.guild.id, member.id)
+
+    if cleared > 0:
+        # Create moderation case
+        create_mod_case(
+            interaction.guild.id,
+            member.id,
+            interaction.user.id,
+            "warnings_cleared",
+            f"Cleared {cleared} warning(s)"
+        )
+
+        embed = discord.Embed(
+            title="✅ Warnings Cleared",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(name="User", value=member.mention, inline=True)
+        embed.add_field(name="Administrator", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Warnings Cleared", value=f"**{cleared}**", inline=True)
+
+        embed.set_footer(text=f"User ID: {member.id}")
+
+        await interaction.followup.send(embed=embed)
+
+        # Try to notify user
+        try:
+            dm_embed = discord.Embed(
+                title=f"✅ Warnings Cleared in {interaction.guild.name}",
+                description=f"Your warnings have been cleared by an administrator.",
+                color=discord.Color.green()
+            )
+            dm_embed.add_field(name="Warnings Cleared", value=f"**{cleared}**", inline=False)
+            await member.send(embed=dm_embed)
+        except discord.Forbidden:
+            pass
+    else:
+        await interaction.followup.send(
+            "❌ Failed to clear warnings.",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="modnote", description="Add a note about a user (visible only to mods)")
+@app_commands.describe(
+    member="The member to add a note about",
+    note="The note text"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_modnote(interaction: discord.Interaction, member: discord.Member, note: str):
+    """Add a private moderation note about a user"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    # Add note to database
+    note_id = add_mod_note(
+        interaction.guild.id,
+        member.id,
+        interaction.user.id,
+        note
+    )
+
+    if note_id is None:
+        await interaction.followup.send(
+            "❌ Failed to add moderation note.",
+            ephemeral=True
+        )
+        return
+
+    embed = discord.Embed(
+        title="📝 Moderation Note Added",
+        color=discord.Color.blue(),
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name="Target User", value=member.mention, inline=True)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Note", value=note, inline=False)
+
+    embed.set_footer(text=f"Note ID: {note_id} | This note is only visible to moderators")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="reason", description="Add/edit reason for a moderation action")
+@app_commands.describe(
+    case_id="The case ID to update",
+    reason="The new reason for the action"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_reason(interaction: discord.Interaction, case_id: int, reason: str):
+    """Update the reason for a moderation case"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    # Check if case exists
+    case = get_mod_case(case_id, interaction.guild.id)
+
+    if not case:
+        await interaction.followup.send(
+            f"❌ Case #{case_id} not found in this server.",
+            ephemeral=True
+        )
+        return
+
+    # Update the reason
+    success = update_mod_case_reason(case_id, interaction.guild.id, reason)
+
+    if success:
+        # Try to fetch the target user
+        try:
+            target_user = await bot.fetch_user(case['user_id'])
+            target_name = f"{target_user.name} ({target_user.mention})"
+        except:
+            target_name = f"Unknown User (ID: {case['user_id']})"
+
+        embed = discord.Embed(
+            title="✅ Case Reason Updated",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(name="Case ID", value=f"**#{case_id}**", inline=True)
+        embed.add_field(name="Action Type", value=case['action_type'].title(), inline=True)
+        embed.add_field(name="Target User", value=target_name, inline=False)
+        embed.add_field(name="Old Reason", value=case.get('reason') or "No reason provided", inline=False)
+        embed.add_field(name="New Reason", value=reason, inline=False)
+        embed.add_field(name="Updated By", value=interaction.user.mention, inline=False)
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    else:
+        await interaction.followup.send(
+            f"❌ Failed to update case #{case_id}.",
+            ephemeral=True
+        )
 
 # Error handling
 @slash_ban.error
