@@ -2114,8 +2114,8 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
         return
 
     try:
-        # Calculate timeout end time using timedelta
-        timeout_until = datetime.now() + timedelta(minutes=duration)
+        # Calculate timeout end time using timedelta with timezone-aware datetime
+        timeout_until = discord.utils.utcnow() + timedelta(minutes=duration)
 
         # Log to database
         case_id = await log_moderation_case(
@@ -2134,7 +2134,7 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
                 title="🦈 You've Been Timed Out",
                 description=f"You have been timed out in **{interaction.guild.name}**",
                 color=discord.Color.orange(),
-                timestamp=datetime.now()
+                timestamp=discord.utils.utcnow()
             )
             embed.add_field(name="Duration", value=f"{duration} minutes", inline=False)
             embed.add_field(name="Reason", value=reason, inline=False)
@@ -2154,7 +2154,7 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
         embed = discord.Embed(
             title="✅ Member Timed Out",
             color=discord.Color.green(),
-            timestamp=datetime.now()
+            timestamp=discord.utils.utcnow()
         )
         embed.add_field(name="Member", value=f"{member.mention} ({member})", inline=False)
         embed.add_field(name="Duration", value=f"{duration} minutes", inline=False)
