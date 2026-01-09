@@ -1940,25 +1940,21 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
               delete_messages: int = 0):
     """Ban a member from the server"""
 
-    # Validate delete_messages parameter
     if delete_messages < 0 or delete_messages > 7:
         await interaction.response.send_message("❌ delete_messages must be between 0 and 7 days.", ephemeral=True)
         return
 
-    # Check if bot can ban this member
     if member.top_role >= interaction.guild.me.top_role:
         await interaction.response.send_message(
             "❌ I cannot ban this member (their role is higher than or equal to mine).", ephemeral=True)
         return
 
-    # Check if moderator can ban this member
     if member.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
         await interaction.response.send_message(
             "❌ You cannot ban this member (their role is higher than or equal to yours).", ephemeral=True)
         return
 
     try:
-        # Log to database
         case_id = await log_moderation_case(
             guild_id=interaction.guild.id,
             user_id=member.id,
@@ -1969,7 +1965,6 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
             moderator_name=str(interaction.user)
         )
 
-        # Try to DM the user
         try:
             embed = discord.Embed(
                 title="🦈 You've Been Banned",
@@ -1982,15 +1977,12 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
             if case_id:
                 embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
             embed.set_footer(text="SorynTech Moderation")
-
             await member.send(embed=embed)
         except discord.Forbidden:
             print(f"⚠️ Could not DM {member} about their ban", flush=True)
 
-        # Perform the ban
         await member.ban(reason=f"{reason} | Moderator: {interaction.user}", delete_message_days=delete_messages)
 
-        # Send confirmation
         embed = discord.Embed(
             title="✅ Member Banned",
             color=discord.Color.green(),
@@ -2013,7 +2005,6 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
         print(f"❌ Error in ban command: {e}", flush=True)
         import traceback
         traceback.print_exc()
-    )
 
 
 @bot.tree.command(name="unban", description="Unban a user from the server")
