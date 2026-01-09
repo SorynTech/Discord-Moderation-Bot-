@@ -68,11 +68,6 @@ from typing import Optional, List, Dict
 # DATABASE CONFIGURATION
 # ============================================================================
 
-# Supabase Database URL (will be loaded from .env)
-SUPABASE_URL = os.getenv('SUPABASE_URL')
-
-# Connection pool for database
-db_pool = None
 
 
 # ============================================================================
@@ -592,6 +587,12 @@ URL = os.getenv('DISCORD_BOT_URL')
 PORT = os.getenv('PORT', 10000)
 STATS_USER = os.getenv('STATS_USER', 'admin')
 STATS_PASS = os.getenv('STATS_PASS', 'changeme')
+# Supabase Database URL (will be loaded from .env)
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+
+# Connection pool for database
+db_pool = None
+
 
 if TOKEN:
     print("Token Found")
