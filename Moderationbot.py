@@ -1761,8 +1761,10 @@ async def on_ready():
             print(f"❌ Failed to sync commands (unexpected error): {e}")
             import traceback
             traceback.print_exc()
+            init_moderation_database()
     else:
         print("Commands already synced, skipping sync")
+
 
 
 @bot.event
