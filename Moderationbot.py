@@ -1534,6 +1534,12 @@ async def stats_page(request):
     hours, remainder = divmod(uptime.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
 
+    # Safe latency calculation with fallback
+    try:
+        latency_ms = round(bot.latency * 1000) if bot.latency is not None else 0
+    except (TypeError, ValueError):
+        latency_ms = 0
+
     # Get guild list
     guild_list = "\n".join([f"                <li>{guild.name} ({guild.member_count} members)</li>"
                             for guild in bot.guilds])
@@ -1677,7 +1683,7 @@ async def stats_page(request):
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Latency</span>
-                        <span class="stat-value">{round(bot.latency * 1000)}ms</span>
+                        <span class="stat-value">{latency_ms}ms</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Started At</span>
@@ -1701,12 +1707,11 @@ async def stats_page(request):
                     </div>
                 </div>
             </div>
-
             <div class="guild-list">
                 <h2>🏝️ Connected Servers ({len(bot.guilds)})</h2>
                 <ul>
 {guild_list}
-                </ul>
+                 </ul>
             </div>
 
             <div class="footer">
@@ -1719,8 +1724,6 @@ async def stats_page(request):
     </html>
     """
     return web.Response(text=html, content_type='text/html')
-
-
 async def start_web_server():
     print(f"[{datetime.now()}] Starting web server on port {PORT}...", flush=True)
     app = web.Application()
@@ -1742,28 +1745,36 @@ async def on_ready():
     bot_start_time = datetime.now()
     print(f'[{datetime.now()}] {bot.user} has connected to Discord!', flush=True)
 
+    # Initialize database FIRST, before anything else
+    print("🔄 Initializing moderation database...", flush=True)
+    db_init_success = init_moderation_database()
+    if db_init_success:
+        print("✅ Moderation database ready", flush=True)
+    else:
+        print("⚠️ Moderation database initialization failed", flush=True)
+
+    # Then sync commands
     if not commands_synced:
         try:
-            print("Attempting to sync commands...")
+            print("Attempting to sync commands...", flush=True)
             synced = await bot.tree.sync()
             commands_synced = True
-            print(f"✅ Successfully synced {len(synced)} command(s)")
+            print(f"✅ Successfully synced {len(synced)} command(s)", flush=True)
         except discord.HTTPException as e:
             if e.status == 429:
-                print(f"⚠️ Rate limited when syncing commands. Will retry automatically.")
+                print(f"⚠️ Rate limited when syncing commands. Will retry automatically.", flush=True)
                 retry_after = e.response.headers.get('Retry-After', 60)
-                print(f"Retry after: {retry_after} seconds")
+                print(f"Retry after: {retry_after} seconds", flush=True)
             else:
-                print(f"❌ Failed to sync commands (HTTP error): {e}")
-                print(f"Status: {e.status}")
-                print(f"Response: {e.text}")
+                print(f"❌ Failed to sync commands (HTTP error): {e}", flush=True)
+                print(f"Status: {e.status}", flush=True)
+                print(f"Response: {e.text}", flush=True)
         except Exception as e:
-            print(f"❌ Failed to sync commands (unexpected error): {e}")
+            print(f"❌ Failed to sync commands (unexpected error): {e}", flush=True)
             import traceback
             traceback.print_exc()
-            init_moderation_database()
     else:
-        print("Commands already synced, skipping sync")
+        print("Commands already synced, skipping sync", flush=True)
 
 
 
