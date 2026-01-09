@@ -542,14 +542,15 @@ def get_user_mod_notes(guild_id: int, user_id: int) -> List[Dict]:
 # CLEANUP FUNCTION
 # ============================================================================
 
-def close_database():
-    """Close all database connections"""
-    global db_pool
-    if db_pool:
-        print("🔌 Closing database connection pool...")
-        db_pool.closeall()
-        print("✅ Database connections closed")
-
+     if not TOKEN:
+         print("ERROR: DISCORD_TOKEN not found in environment variables!")
+         print("Make sure your .env file contains DISCORD_TOKEN=your_token_here")
+     else:
+         print("Starting bot...")
+         try:
+             bot.run(TOKEN, log_handler=None)
+         finally:
+             close_database()
 
 # ============================================================================
 # END OF DATABASE FUNCTIONS
