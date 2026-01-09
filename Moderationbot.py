@@ -2132,12 +2132,6 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
 
     await interaction.response.send_message(embed=embed)
 
-# ==================================================================
-# NEW COMMANDS TO ADD TO Main.py
-# ==================================================================
-# Add these commands after the existing @bot.tree.command definitions
-# and before the error handlers section (@slash_ban.error)
-# ==================================================================
 
 @bot.tree.command(name="membercount", description="Display server member statistics")
 async def slash_membercount(interaction: discord.Interaction):
