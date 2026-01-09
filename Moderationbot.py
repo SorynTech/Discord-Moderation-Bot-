@@ -1855,7 +1855,7 @@ async def on_command_error(ctx, error):
 
 
 @app_commands.checks.has_permissions(kick_members=True)
-async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+async def slash_kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     """Kick a member from the server"""
 
     # Check if bot can kick this member
@@ -2043,7 +2043,7 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
     reason="Reason for timeout"
 )
 @app_commands.checks.has_permissions(moderate_members=True)
-async def mute(interaction: discord.Interaction, member: discord.Member, duration: int,
+async def slash_mute(interaction: discord.Interaction, member: discord.Member, duration: int,
                reason: str = "No reason provided"):
     """Timeout a member for a specified duration"""
 
