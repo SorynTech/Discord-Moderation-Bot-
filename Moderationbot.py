@@ -1936,7 +1936,7 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
     delete_messages="Delete messages from the last X days (0-7)"
 )
 @app_commands.checks.has_permissions(ban_members=True)
-async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided",
+async def slash_ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided",
               delete_messages: int = 0):
     """Ban a member from the server"""
 
