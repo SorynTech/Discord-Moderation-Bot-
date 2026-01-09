@@ -80,17 +80,38 @@ db_pool = None
 # ============================================================================
 
 def get_db_connection():
-    """Get a database connection from the pool"""
+    """
+    Obtain a connection from the module's PostgreSQL connection pool.
+    
+    Returns:
+        psycopg2.extensions.connection: A database connection checked out from the global pool.
+    """
     return db_pool.getconn()
 
 
 def return_db_connection(conn):
-    """Return a connection to the pool"""
+    """
+    Release a database connection back into the global connection pool.
+    
+    Parameters:
+        conn: The database connection to return to the pool.
+    """
     db_pool.putconn(conn)
 
 
 def init_moderation_database():
-    """Initialize database with moderation tracking tables"""
+    """
+    Initialize the moderation database and connection pool.
+    
+    Ensures the module-level connection pool is created and that the moderation tables
+    (moderation_cases, moderation_warnings, moderation_notes) and their indexes exist.
+    Requires the SUPABASE_URL environment variable; if it is missing or an error
+    occurs, moderation tracking remains disabled and the function returns False.
+    
+    Returns:
+        bool: `True` if initialization succeeded and the connection pool was created,
+        `False` otherwise.
+    """
     global db_pool
 
     print("=" * 60)
@@ -260,18 +281,20 @@ def init_moderation_database():
 def create_mod_case(guild_id: int, user_id: int, moderator_id: int,
                     action_type: str, reason: str = None) -> Optional[int]:
     """
-    Create a new moderation case
-
-    Args:
-        guild_id: Discord guild ID
-        user_id: Target user ID
-        moderator_id: Moderator user ID
-        action_type: Type of action (kick, ban, mute, etc.)
-        reason: Reason for the action
-
-    Returns:
-        case_id if successful, None otherwise
-    """
+                    Create a new moderation case record in the database.
+                    
+                    Inserts a moderation case for the given guild and user with the acting moderator, action type, and optional reason. If the database pool is not initialized or the insert fails, returns None.
+                    
+                    Parameters:
+                        guild_id (int): Discord guild (server) ID where the action occurred.
+                        user_id (int): ID of the user the case applies to.
+                        moderator_id (int): ID of the moderator who performed the action.
+                        action_type (str): Short identifier for the action (e.g., "kick", "ban", "mute").
+                        reason (str, optional): Human-readable reason for the action.
+                    
+                    Returns:
+                        int or None: The newly created case_id on success, or `None` if the database is unavailable or an error occurred.
+                    """
     if db_pool is None:
         return None
 
@@ -301,7 +324,17 @@ def create_mod_case(guild_id: int, user_id: int, moderator_id: int,
 
 
 def get_mod_case(case_id: int, guild_id: int) -> Optional[Dict]:
-    """Get details of a specific moderation case"""
+    """
+    Retrieve a moderation case record for a guild by its case ID.
+    
+    Parameters:
+        case_id (int): The moderation case identifier.
+        guild_id (int): The guild (server) identifier to scope the lookup.
+    
+    Returns:
+        dict: The moderation case record keyed by column names if found.
+        None: If no matching case exists, the database pool is unavailable, or an error occurs.
+    """
     if db_pool is None:
         return None
 
@@ -327,7 +360,14 @@ def get_mod_case(case_id: int, guild_id: int) -> Optional[Dict]:
 
 
 def update_mod_case_reason(case_id: int, guild_id: int, new_reason: str) -> bool:
-    """Update the reason for a moderation case"""
+    """
+    Update the stored reason for a moderation case and set its updated timestamp.
+    
+    Updates the `reason` and `updated_at` fields for the moderation case identified by `case_id` within the specified guild. 
+    
+    Returns:
+        True if an existing case was updated, False otherwise (including when the DB pool is unavailable).
+    """
     if db_pool is None:
         return False
 
@@ -358,7 +398,22 @@ def update_mod_case_reason(case_id: int, guild_id: int, new_reason: str) -> bool
 
 
 def get_user_mod_cases(guild_id: int, user_id: int, limit: int = 10) -> List[Dict]:
-    """Get moderation cases for a specific user"""
+    """
+    Retrieve recent moderation cases for a user in a guild.
+    
+    Results are ordered by `created_at` descending and limited to `limit`. Each item is a dictionary
+    mapping column names (e.g., `case_id`, `guild_id`, `user_id`, `moderator_id`, `action_type`,
+    `reason`, `created_at`, `updated_at`) to their values.
+    
+    Parameters:
+        guild_id (int): ID of the guild to query.
+        user_id (int): ID of the user whose cases to retrieve.
+        limit (int): Maximum number of cases to return; defaults to 10.
+    
+    Returns:
+        List[Dict]: A list of moderation case dictionaries. Returns an empty list if the database
+        pool is not initialized or if an error occurs while fetching cases.
+    """
     if db_pool is None:
         return []
 
@@ -390,7 +445,18 @@ def get_user_mod_cases(guild_id: int, user_id: int, limit: int = 10) -> List[Dic
 # ============================================================================
 
 def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str) -> Optional[int]:
-    """Add a warning to a user"""
+    """
+    Insert a moderation warning for a user in the guild and return its database ID.
+    
+    Parameters:
+        guild_id (int): Guild identifier where the warning applies.
+        user_id (int): User identifier who receives the warning.
+        moderator_id (int): Moderator identifier who issued the warning.
+        reason (str): Textual reason for the warning.
+    
+    Returns:
+        warning_id (int) or None: The newly created warning's ID on success, or `None` if the database pool is unavailable or an error occurred.
+    """
     if db_pool is None:
         return None
 
@@ -420,7 +486,18 @@ def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str) -> 
 
 
 def get_user_warnings(guild_id: int, user_id: int) -> List[Dict]:
-    """Get all warnings for a specific user"""
+    """
+    Retrieve all moderation warnings for a user in a guild, ordered newest first.
+    
+    Each item in the returned list is a dict representing a row from the
+    moderation_warnings table (e.g. `warning_id`, `guild_id`, `user_id`,
+    `moderator_id`, `reason`, `created_at`). If the database pool is not
+    initialized or an error occurs, an empty list is returned.
+    
+    Returns:
+        List[Dict]: Warning records ordered by `created_at` descending, or an
+        empty list if none are found or on error.
+    """
     if db_pool is None:
         return []
 
@@ -447,7 +524,14 @@ def get_user_warnings(guild_id: int, user_id: int) -> List[Dict]:
 
 
 def clear_user_warnings(guild_id: int, user_id: int) -> int:
-    """Clear all warnings for a user, returns number of warnings cleared"""
+    """
+    Remove all moderation warnings for a user in a guild.
+    
+    Deletes any stored warnings associated with the given guild and user and returns how many entries were removed.
+    
+    Returns:
+        int: Number of warnings removed, or 0 if none were removed or the database is unavailable.
+    """
     if db_pool is None:
         return 0
 
@@ -482,7 +566,18 @@ def clear_user_warnings(guild_id: int, user_id: int) -> int:
 # ============================================================================
 
 def add_mod_note(guild_id: int, user_id: int, moderator_id: int, note_text: str) -> Optional[int]:
-    """Add a moderation note (visible only to moderators)"""
+    """
+    Create a moderator-visible note for a user in the moderation database.
+    
+    Parameters:
+        guild_id (int): Discord guild (server) ID where the note applies.
+        user_id (int): ID of the user the note is about.
+        moderator_id (int): ID of the moderator creating the note.
+        note_text (str): Text content of the moderator note.
+    
+    Returns:
+        The new note's `note_id` if the note was successfully created, `None` otherwise.
+    """
     if db_pool is None:
         return None
 
@@ -512,7 +607,18 @@ def add_mod_note(guild_id: int, user_id: int, moderator_id: int, note_text: str)
 
 
 def get_user_mod_notes(guild_id: int, user_id: int) -> List[Dict]:
-    """Get all moderation notes for a specific user"""
+    """
+    Retrieve moderation notes for a user in a guild, ordered from newest to oldest.
+    
+    Parameters:
+        guild_id (int): Discord guild (server) ID to filter notes.
+        user_id (int): Discord user ID whose notes to retrieve.
+    
+    Returns:
+        List[Dict]: A list of dictionaries, each representing a moderation note with keys such as
+        `note_id`, `guild_id`, `user_id`, `moderator_id`, `note_text`, and `created_at`.
+        Returns an empty list if no notes are found, the database pool is unavailable, or an error occurs.
+    """
     if db_pool is None:
         return []
 
@@ -543,7 +649,9 @@ def get_user_mod_notes(guild_id: int, user_id: int) -> List[Dict]:
 # ============================================================================
 
 def close_database():
-    """Close all database connections"""
+    """
+    Close all connections in the global database connection pool if one exists.
+    """
     global db_pool
     if db_pool:
         print("🔌 Closing database connection pool...")
@@ -2816,6 +2924,18 @@ async def slash_removerole(interaction: discord.Interaction, member: discord.Mem
 )
 @app_commands.checks.has_permissions(manage_roles=True)
 async def slash_createrole(interaction: discord.Interaction, name: str, color: str = None, hoist: bool = False, mentionable: bool = False):
+    """
+    Create a new guild role and notify the invoker with an embed summarizing the created role.
+    
+    Creates a role in the interaction's guild with the provided name, optional hex color, hoist (display separately), and mentionable flag, then sends a confirmation embed containing the role mention, ID, color, hoist and mentionable status. If the color string is provided it must be a hex value (e.g., `#FF5733` or `FF5733`); invalid color formats or insufficient bot permissions result in an ephemeral error message sent to the invoker.
+    
+    Parameters:
+        interaction (discord.Interaction): The interaction that invoked the command.
+        name (str): The name for the new role.
+        color (str, optional): Hex color for the role (with or without leading `#`). Defaults to None.
+        hoist (bool, optional): Whether the role should be displayed separately in the member list. Defaults to False.
+        mentionable (bool, optional): Whether the role should be mentionable by users. Defaults to False.
+    """
     if not await check_emergency_shutdown(interaction):
         return
 
@@ -2916,6 +3036,11 @@ async def slash_deleterole(interaction: discord.Interaction, role: discord.Role)
 @bot.tree.command(name="roleinfo", description="Display information about a role")
 @app_commands.describe(role="The role to get information about")
 async def slash_roleinfo(interaction: discord.Interaction, role: discord.Role):
+    """
+    Send an embed describing the specified role's properties and notable permissions.
+    
+    The embed includes role name and ID, color, position, whether the role is hoisted or mentionable, member count, managed status, creation date, and a list of key permissions (e.g., Administrator, Manage Server, Manage Roles, Manage Channels, Kick/Ban Members, Timeout Members). The embed is posted as a follow-up to the invoking interaction.
+    """
     if not await check_emergency_shutdown(interaction):
         return
 
@@ -2987,6 +3112,11 @@ async def slash_roleinfo(interaction: discord.Interaction, role: discord.Role):
 @bot.tree.command(name="rolemembers", description="List all members with a specific role")
 @app_commands.describe(role="The role to list members for")
 async def slash_rolemembers(interaction: discord.Interaction, role: discord.Role):
+    """
+    List members who have the specified role and send an embed summarizing them.
+    
+    Sends an embed containing the total number of members with the role and up to 20 member mentions and names; if more members exist, the embed notes how many additional members remain and suggests using `/role-count`. If no members have the role, sends an ephemeral error message.
+    """
     if not await check_emergency_shutdown(interaction):
         return
 
@@ -3036,7 +3166,15 @@ async def slash_rolemembers(interaction: discord.Interaction, role: discord.Role
 @app_commands.describe(case_id="The case ID number to look up")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def slash_case(interaction: discord.Interaction, case_id: int):
-    """View details of a moderation case"""
+    """
+    Display an ephemeral embed with details for a moderation case.
+    
+    If moderation tracking is disabled the command sends an ephemeral error. If the case ID is not found for the current guild it sends an ephemeral "not found" message. When a case is found it sends an ephemeral embed containing the action type, target user, moderator, reason, creation timestamp, and last-updated timestamp (when applicable). User and moderator names are resolved when possible and fall back to "Unknown" with the corresponding ID when resolution fails.
+    
+    Parameters:
+        interaction (discord.Interaction): The interaction that invoked the command.
+        case_id (int): The moderation case identifier to look up.
+    """
     if not await check_emergency_shutdown(interaction):
         return
 
@@ -3097,6 +3235,372 @@ async def slash_case(interaction: discord.Interaction, case_id: int):
     embed.set_footer(text=f"Case ID: {case_id} | Created")
 
     await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="warn", description="Issue a warning to a user")
+@app_commands.describe(
+    member="The member to warn",
+    reason="Reason for the warning"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_warn(interaction: discord.Interaction, member: discord.Member, reason: str):
+    """
+    Issue a moderation warning for a guild member, record it in the moderation database, and notify relevant parties.
+    
+    Creates a warning record (and a linked moderation case when possible), sends a confirmation embed in the interaction channel with the new warning count, and attempts to DM the warned member with details. If moderation tracking is not enabled or database operations fail, sends an ephemeral error message. If the bot cannot DM the user, notifies the moderator that the DM failed.
+    
+    Parameters:
+        interaction (discord.Interaction): The command interaction triggering the warning.
+        member (discord.Member): The guild member to warn.
+        reason (str): The reason for the warning.
+    """
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    # Add warning to database
+    warning_id = add_warning(
+        interaction.guild.id,
+        member.id,
+        interaction.user.id,
+        reason
+    )
+
+    if warning_id is None:
+        await interaction.followup.send(
+            "❌ Failed to add warning to database.",
+            ephemeral=True
+        )
+        return
+
+    # Create moderation case
+    case_id = create_mod_case(
+        interaction.guild.id,
+        member.id,
+        interaction.user.id,
+        "warning",
+        reason
+    )
+
+    # Get total warnings for user
+    warnings = get_user_warnings(interaction.guild.id, member.id)
+    warning_count = len(warnings)
+
+    # Create embed
+    embed = discord.Embed(
+        title="⚠️ Warning Issued",
+        color=discord.Color.orange(),
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name="User", value=member.mention, inline=True)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Warning Count", value=f"**{warning_count}**", inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+
+    if case_id:
+        embed.set_footer(text=f"Warning ID: {warning_id} | Case ID: {case_id}")
+    else:
+        embed.set_footer(text=f"Warning ID: {warning_id}")
+
+    await interaction.followup.send(embed=embed)
+
+    # Try to DM the user
+    try:
+        dm_embed = discord.Embed(
+            title=f"⚠️ Warning in {interaction.guild.name}",
+            description=f"You have been warned by a moderator.",
+            color=discord.Color.orange()
+        )
+        dm_embed.add_field(name="Reason", value=reason, inline=False)
+        dm_embed.add_field(name="Total Warnings", value=f"**{warning_count}**", inline=False)
+        dm_embed.set_footer(text="Please review the server rules to avoid further action.")
+
+        await member.send(embed=dm_embed)
+    except discord.Forbidden:
+        await interaction.followup.send(
+            f"⚠️ Could not DM {member.mention} about the warning.",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="warnings", description="View warnings for a specific user")
+@app_commands.describe(member="The member to check warnings for")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_warnings(interaction: discord.Interaction, member: discord.Member):
+    """
+    Show a user's moderation warnings in an ephemeral embed.
+    
+    If moderation tracking is disabled, sends an ephemeral error message. If the bot is in emergency shutdown the command is blocked. Displays up to 10 most recent warnings with the moderator name (or ID if unknown), UTC timestamp, and reason; when more than 10 warnings exist the embed footer notes the total count, otherwise the footer shows the user's ID. If the user has no warnings, sends an ephemeral confirmation stating so.
+    """
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    warnings = get_user_warnings(interaction.guild.id, member.id)
+
+    if not warnings:
+        await interaction.followup.send(
+            f"✅ {member.mention} has no warnings on record.",
+            ephemeral=True
+        )
+        return
+
+    embed = discord.Embed(
+        title=f"⚠️ Warnings for {member.name}",
+        description=f"Total Warnings: **{len(warnings)}**",
+        color=discord.Color.orange(),
+        timestamp=datetime.now()
+    )
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+
+    # Display up to 10 most recent warnings
+    for i, warning in enumerate(warnings[:10], 1):
+        try:
+            moderator = await bot.fetch_user(warning['moderator_id'])
+            mod_name = moderator.name
+        except:
+            mod_name = f"Unknown (ID: {warning['moderator_id']})"
+
+        warning_date = warning['created_at'].strftime('%Y-%m-%d %H:%M UTC')
+
+        embed.add_field(
+            name=f"Warning #{warning['warning_id']}",
+            value=f"**Moderator:** {mod_name}\n**Date:** {warning_date}\n**Reason:** {warning['reason']}",
+            inline=False
+        )
+
+    if len(warnings) > 10:
+        embed.set_footer(text=f"Showing 10 of {len(warnings)} warnings")
+    else:
+        embed.set_footer(text=f"User ID: {member.id}")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="clearwarnings", description="Clear all warnings for a user")
+@app_commands.describe(member="The member to clear warnings for")
+@app_commands.checks.has_permissions(administrator=True)
+async def slash_clearwarnings(interaction: discord.Interaction, member: discord.Member):
+    """Clear all warnings for a user (Administrator only)"""
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    # Get current warning count before clearing
+    warnings = get_user_warnings(interaction.guild.id, member.id)
+    warning_count = len(warnings)
+
+    if warning_count == 0:
+        await interaction.followup.send(
+            f"ℹ️ {member.mention} has no warnings to clear.",
+            ephemeral=True
+        )
+        return
+
+    # Clear warnings
+    cleared = clear_user_warnings(interaction.guild.id, member.id)
+
+    if cleared > 0:
+        # Create moderation case
+        create_mod_case(
+            interaction.guild.id,
+            member.id,
+            interaction.user.id,
+            "warnings_cleared",
+            f"Cleared {cleared} warning(s)"
+        )
+
+        embed = discord.Embed(
+            title="✅ Warnings Cleared",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(name="User", value=member.mention, inline=True)
+        embed.add_field(name="Administrator", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Warnings Cleared", value=f"**{cleared}**", inline=True)
+
+        embed.set_footer(text=f"User ID: {member.id}")
+
+        await interaction.followup.send(embed=embed)
+
+        # Try to notify user
+        try:
+            dm_embed = discord.Embed(
+                title=f"✅ Warnings Cleared in {interaction.guild.name}",
+                description=f"Your warnings have been cleared by an administrator.",
+                color=discord.Color.green()
+            )
+            dm_embed.add_field(name="Warnings Cleared", value=f"**{cleared}**", inline=False)
+            await member.send(embed=dm_embed)
+        except discord.Forbidden:
+            pass
+    else:
+        await interaction.followup.send(
+            "❌ Failed to clear warnings.",
+            ephemeral=True
+        )
+
+
+@bot.tree.command(name="modnote", description="Add a note about a user (visible only to mods)")
+@app_commands.describe(
+    member="The member to add a note about",
+    note="The note text"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_modnote(interaction: discord.Interaction, member: discord.Member, note: str):
+    """
+    Add a moderator-only note for a guild member and acknowledge the created entry.
+    
+    Parameters:
+        interaction (discord.Interaction): The interaction invoking the command; used to determine guild and moderator.
+        member (discord.Member): The member the note applies to.
+        note (str): The text content of the moderation note.
+    
+    Details:
+        Creates a database record for the note and replies with an ephemeral embed containing the note ID and summary. If moderation tracking is disabled or the database insert fails, an ephemeral error message is sent instead.
+    """
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    # Add note to database
+    note_id = add_mod_note(
+        interaction.guild.id,
+        member.id,
+        interaction.user.id,
+        note
+    )
+
+    if note_id is None:
+        await interaction.followup.send(
+            "❌ Failed to add moderation note.",
+            ephemeral=True
+        )
+        return
+
+    embed = discord.Embed(
+        title="📝 Moderation Note Added",
+        color=discord.Color.blue(),
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(name="Target User", value=member.mention, inline=True)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Note", value=note, inline=False)
+
+    embed.set_footer(text=f"Note ID: {note_id} | This note is only visible to moderators")
+
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="reason", description="Add/edit reason for a moderation action")
+@app_commands.describe(
+    case_id="The case ID to update",
+    reason="The new reason for the action"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def slash_reason(interaction: discord.Interaction, case_id: int, reason: str):
+    """
+    Update the stored reason for a moderation case and notify the command issuer with a confirmation or error message.
+    
+    Parameters:
+        interaction (discord.Interaction): The interaction that invoked the command; used to send responses.
+        case_id (int): The moderation case identifier within the current guild.
+        reason (str): The new reason text to set for the case.
+    """
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    if db_pool is None:
+        await interaction.response.send_message(
+            "❌ Moderation tracking is not enabled. Contact the bot owner.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await asyncio.sleep(0.3)
+
+    # Check if case exists
+    case = get_mod_case(case_id, interaction.guild.id)
+
+    if not case:
+        await interaction.followup.send(
+            f"❌ Case #{case_id} not found in this server.",
+            ephemeral=True
+        )
+        return
+
+    # Update the reason
+    success = update_mod_case_reason(case_id, interaction.guild.id, reason)
+
+    if success:
+        # Try to fetch the target user
+        try:
+            target_user = await bot.fetch_user(case['user_id'])
+            target_name = f"{target_user.name} ({target_user.mention})"
+        except:
+            target_name = f"Unknown User (ID: {case['user_id']})"
+
+        embed = discord.Embed(
+            title="✅ Case Reason Updated",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(name="Case ID", value=f"**#{case_id}**", inline=True)
+        embed.add_field(name="Action Type", value=case['action_type'].title(), inline=True)
+        embed.add_field(name="Target User", value=target_name, inline=False)
+        embed.add_field(name="Old Reason", value=case.get('reason') or "No reason provided", inline=False)
+        embed.add_field(name="New Reason", value=reason, inline=False)
+        embed.add_field(name="Updated By", value=interaction.user.mention, inline=False)
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    else:
+        await interaction.followup.send(
+            f"❌ Failed to update case #{case_id}.",
+            ephemeral=True
+        )
+
 # Error handling
 @slash_ban.error
 @slash_kick.error
