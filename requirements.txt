@@ -1,5 +1,7 @@
 discord.py
 aiohttp
 requests
-psycopg2 
-sslmode='require'
+discord.py
+aiohttp
+requests
+psycopg2
