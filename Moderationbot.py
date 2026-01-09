@@ -1763,6 +1763,7 @@ async def on_ready():
             traceback.print_exc()
     else:
         print("Commands already synced, skipping sync")
+        init_moderation_database()
 
 
 @bot.event
