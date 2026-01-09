@@ -31,7 +31,8 @@ except Exception as e:
 
 print("STEP 5: Importing other dependencies...", flush=True)
 
-from discord import app_commands, Member
+import discord
+from discord import app_commands
 from discord.ext import commands
 import requests
 import random as r
@@ -518,6 +519,38 @@ def clear_user_warnings(guild_id: int, user_id: int, user_name: str = None) -> i
             return_db_connection(conn)
         return 0
 
+
+# Add this helper function to log moderation cases
+async def log_moderation_case(guild_id, user_id, moderator_id, action_type, reason, user_name=None,
+                              moderator_name=None):
+    """Log a moderation case to the database"""
+    if db_pool is None:
+        print("⚠️ Database not available, skipping moderation log", flush=True)
+        return None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''
+                    INSERT INTO moderation_cases
+                    (guild_id, user_id, moderator_id, action_type, reason, user_name, moderator_name)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING case_id
+                    ''', (guild_id, user_id, moderator_id, action_type, reason, user_name, moderator_name))
+
+        case_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return_db_connection(conn)
+
+        print(f"✅ Logged {action_type} case #{case_id} for user {user_id} in guild {guild_id}", flush=True)
+        return case_id
+
+    except Exception as e:
+        print(f"❌ Error logging moderation case: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return None
 
 # ============================================================================
 # MODERATION NOTE FUNCTIONS
@@ -1820,64 +1853,166 @@ async def on_command_error(ctx, error):
             print(f"⚠️ Rate limited! Response: {error.text}")
             await ctx.send("⚠️ Bot is being rate limited. Please wait a moment.")
 
-@bot.tree.command(name="kick", description="Kick a member from the server")
-@app_commands.describe(
-    member="The member to kick",
-    reason="Reason for kicking"
-)
+
 @app_commands.checks.has_permissions(kick_members=True)
-async def slash_kick(interaction: discord.Interaction, member: discord.Member, reason: str = None):
-    if not await check_emergency_shutdown(interaction):
-        return
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    """Kick a member from the server"""
 
-    await interaction.response.defer()
-    # Add delay to prevent rate limiting
-    await asyncio.sleep(0.5)
-
-    if not interaction.guild.me.guild_permissions.kick_members:
-        await interaction.followup.send("❌ I don't have permission to kick members!", ephemeral=True)
-        return
-
+    # Check if bot can kick this member
     if member.top_role >= interaction.guild.me.top_role:
-        await interaction.followup.send(
-            "❌ I cannot kick this member (their role is equal or higher than mine)!",
-            ephemeral=True
-        )
+        await interaction.response.send_message(
+            "❌ I cannot kick this member (their role is higher than or equal to mine).", ephemeral=True)
         return
 
-    await member.kick(reason=reason)
-    await interaction.followup.send(
-        f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}"
-    )
+    # Check if moderator can kick this member
+    if member.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+        await interaction.response.send_message(
+            "❌ You cannot kick this member (their role is higher than or equal to yours).", ephemeral=True)
+        return
+
+    try:
+        # Log to database BEFORE kicking
+        case_id = await log_moderation_case(
+            guild_id=interaction.guild.id,
+            user_id=member.id,
+            moderator_id=interaction.user.id,
+            action_type="kick",
+            reason=reason,
+            user_name=str(member),
+            moderator_name=str(interaction.user)
+        )
+
+        # Try to DM the user
+        try:
+            embed = discord.Embed(
+                title="🦈 You've Been Kicked",
+                description=f"You have been kicked from **{interaction.guild.name}**",
+                color=discord.Color.orange(),
+                timestamp=datetime.now()
+            )
+            embed.add_field(name="Reason", value=reason, inline=False)
+            embed.add_field(name="Moderator", value=str(interaction.user), inline=False)
+            if case_id:
+                embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
+            embed.set_footer(text="SorynTech Moderation")
+
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            print(f"⚠️ Could not DM {member} about their kick", flush=True)
+
+        # Perform the kick
+        await member.kick(reason=f"{reason} | Moderator: {interaction.user}")
+
+        # Send confirmation
+        embed = discord.Embed(
+            title="✅ Member Kicked",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+        embed.add_field(name="Member", value=f"{member.mention} ({member})", inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.add_field(name="Moderator", value=interaction.user.mention, inline=False)
+        if case_id:
+            embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
+        embed.set_footer(text="SorynTech Moderation")
+
+        await interaction.response.send_message(embed=embed)
+        print(f"✅ {interaction.user} kicked {member} from {interaction.guild.name} | Case: {case_id}", flush=True)
+
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ I don't have permission to kick this member.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+        print(f"❌ Error in kick command: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
 
+# Fixed BAN command with database logging
 @bot.tree.command(name="ban", description="Ban a member from the server")
 @app_commands.describe(
     member="The member to ban",
-    reason="Reason for banning"
+    reason="Reason for banning",
+    delete_messages="Delete messages from the last X days (0-7)"
 )
 @app_commands.checks.has_permissions(ban_members=True)
-async def slash_ban(interaction: discord.Interaction, member: discord.Member, reason: str = None):
-    if not await check_emergency_shutdown(interaction):
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided",
+              delete_messages: int = 0):
+    """Ban a member from the server"""
+
+    # Validate delete_messages parameter
+    if delete_messages < 0 or delete_messages > 7:
+        await interaction.response.send_message("❌ delete_messages must be between 0 and 7 days.", ephemeral=True)
         return
 
-    await interaction.response.defer()
-    await asyncio.sleep(0.5)
-
-    if not interaction.guild.me.guild_permissions.ban_members:
-        await interaction.followup.send("❌ I don't have permission to ban members!", ephemeral=True)
-        return
-
+    # Check if bot can ban this member
     if member.top_role >= interaction.guild.me.top_role:
-        await interaction.followup.send(
-            "❌ I cannot ban this member (their role is equal or higher than mine)!",
-            ephemeral=True
-        )
+        await interaction.response.send_message(
+            "❌ I cannot ban this member (their role is higher than or equal to mine).", ephemeral=True)
         return
 
-    await member.ban(reason=reason)
-    await interaction.followup.send(
-        f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}"
+    # Check if moderator can ban this member
+    if member.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+        await interaction.response.send_message(
+            "❌ You cannot ban this member (their role is higher than or equal to yours).", ephemeral=True)
+        return
+
+    try:
+        # Log to database
+        case_id = await log_moderation_case(
+            guild_id=interaction.guild.id,
+            user_id=member.id,
+            moderator_id=interaction.user.id,
+            action_type="ban",
+            reason=reason,
+            user_name=str(member),
+            moderator_name=str(interaction.user)
+        )
+
+        # Try to DM the user
+        try:
+            embed = discord.Embed(
+                title="🦈 You've Been Banned",
+                description=f"You have been banned from **{interaction.guild.name}**",
+                color=discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            embed.add_field(name="Reason", value=reason, inline=False)
+            embed.add_field(name="Moderator", value=str(interaction.user), inline=False)
+            if case_id:
+                embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
+            embed.set_footer(text="SorynTech Moderation")
+
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            print(f"⚠️ Could not DM {member} about their ban", flush=True)
+
+        # Perform the ban
+        await member.ban(reason=f"{reason} | Moderator: {interaction.user}", delete_message_days=delete_messages)
+
+        # Send confirmation
+        embed = discord.Embed(
+            title="✅ Member Banned",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+        embed.add_field(name="Member", value=f"{member.mention} ({member})", inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.add_field(name="Moderator", value=interaction.user.mention, inline=False)
+        if case_id:
+            embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
+        embed.set_footer(text="SorynTech Moderation")
+
+        await interaction.response.send_message(embed=embed)
+        print(f"✅ {interaction.user} banned {member} from {interaction.guild.name} | Case: {case_id}", flush=True)
+
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ I don't have permission to ban this member.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+        print(f"❌ Error in ban command: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
     )
 
 
@@ -1909,36 +2044,100 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
         await interaction.followup.send("❌ Invalid user ID!", ephemeral=True)
 
 
+# Fixed MUTE command with proper timedelta usage
 @bot.tree.command(name="mute", description="Timeout a member")
 @app_commands.describe(
-    member="The member to mute",
-    duration="Duration in seconds (default 60)",
-    reason="Reason for muting"
+    member="The member to timeout",
+    duration="Duration in minutes",
+    reason="Reason for timeout"
 )
 @app_commands.checks.has_permissions(moderate_members=True)
-async def slash_mute(interaction: discord.Interaction, member: discord.Member, duration: int = 60, reason: str = None):
-    if not await check_emergency_shutdown(interaction):
-        return
+async def mute(interaction: discord.Interaction, member: discord.Member, duration: int,
+               reason: str = "No reason provided"):
+    """Timeout a member for a specified duration"""
 
-    await interaction.response.defer()
-    await asyncio.sleep(0.5)
-
-    if not interaction.guild.me.guild_permissions.moderate_members:
-        await interaction.followup.send("❌ I don't have permission to timeout members!", ephemeral=True)
-        return
-
+    # Check if bot can timeout this member
     if member.top_role >= interaction.guild.me.top_role:
-        await interaction.followup.send(
-            "❌ I cannot mute this member (their role is equal or higher than mine)!",
-            ephemeral=True
-        )
+        await interaction.response.send_message(
+            "❌ I cannot timeout this member (their role is higher than or equal to mine).", ephemeral=True)
         return
 
-    duration_td = datetime.timedelta(seconds=duration)
-    await member.timeout(duration_td, reason=reason)
-    await interaction.followup.send(
-        f"✅ {member.mention} has been muted for {duration} seconds. Reason: {reason or 'No reason provided'}"
-    )
+    # Check if moderator can timeout this member
+    if member.top_role >= interaction.user.top_role and interaction.user.id != interaction.guild.owner_id:
+        await interaction.response.send_message(
+            "❌ You cannot timeout this member (their role is higher than or equal to yours).", ephemeral=True)
+        return
+
+    # Validate duration
+    if duration < 1 or duration > 40320:  # Max 28 days (40320 minutes)
+        await interaction.response.send_message("❌ Duration must be between 1 minute and 28 days (40320 minutes).",
+                                                ephemeral=True)
+        return
+
+    try:
+        # Calculate timeout end time using timedelta
+        timeout_until = datetime.now() + timedelta(minutes=duration)
+
+        # Log to database
+        case_id = await log_moderation_case(
+            guild_id=interaction.guild.id,
+            user_id=member.id,
+            moderator_id=interaction.user.id,
+            action_type="timeout",
+            reason=f"{reason} (Duration: {duration} minutes)",
+            user_name=str(member),
+            moderator_name=str(interaction.user)
+        )
+
+        # Try to DM the user
+        try:
+            embed = discord.Embed(
+                title="🦈 You've Been Timed Out",
+                description=f"You have been timed out in **{interaction.guild.name}**",
+                color=discord.Color.orange(),
+                timestamp=datetime.now()
+            )
+            embed.add_field(name="Duration", value=f"{duration} minutes", inline=False)
+            embed.add_field(name="Reason", value=reason, inline=False)
+            embed.add_field(name="Moderator", value=str(interaction.user), inline=False)
+            if case_id:
+                embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
+            embed.set_footer(text="SorynTech Moderation")
+
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            print(f"⚠️ Could not DM {member} about their timeout", flush=True)
+
+        # Perform the timeout
+        await member.timeout(timeout_until, reason=f"{reason} | Moderator: {interaction.user}")
+
+        # Send confirmation
+        embed = discord.Embed(
+            title="✅ Member Timed Out",
+            color=discord.Color.green(),
+            timestamp=datetime.now()
+        )
+        embed.add_field(name="Member", value=f"{member.mention} ({member})", inline=False)
+        embed.add_field(name="Duration", value=f"{duration} minutes", inline=False)
+        embed.add_field(name="Until", value=f"<t:{int(timeout_until.timestamp())}:F>", inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.add_field(name="Moderator", value=interaction.user.mention, inline=False)
+        if case_id:
+            embed.add_field(name="Case ID", value=f"#{case_id}", inline=False)
+        embed.set_footer(text="SorynTech Moderation")
+
+        await interaction.response.send_message(embed=embed)
+        print(
+            f"✅ {interaction.user} timed out {member} for {duration} minutes in {interaction.guild.name} | Case: {case_id}",
+            flush=True)
+
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ I don't have permission to timeout this member.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ An error occurred: {str(e)}", ephemeral=True)
+        print(f"❌ Error in mute command: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
 
 @bot.tree.command(name="unmute", description="Unmute a member")
