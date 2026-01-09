@@ -3189,7 +3189,7 @@ async def slash_case(interaction: discord.Interaction, case_id: int):
     await asyncio.sleep(0.3)
 
     # Get the case from database
-    case = get_mod_case(case_id, interaction.guild.id)
+    case = await asyncio.to_thread(get_mod_case, case_id, interaction.guild.id)
 
     if not case:
         await interaction.followup.send(
