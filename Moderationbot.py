@@ -1635,14 +1635,6 @@ async def on_ready():
     else:
         print("Commands already synced, skipping sync")
 
-    # Initialize moderation database
-    if db_pool is None:
-        print("Initializing moderation database...")
-        init_moderation_database()
-        print("✅ Moderation database initialized")
-    else:
-        print("Database already initialized, skipping initialization")
-
 
 @bot.event
 async def on_message(message):
@@ -1713,11 +1705,8 @@ async def slash_kick(interaction: discord.Interaction, member: discord.Member, r
 
     await member.kick(reason=reason)
     await interaction.followup.send(
-        f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}")
-
-    # Database integration for kick command
-    if db_pool:
-        create_mod_case(interaction.guild.id, member.id, interaction.user.id, "kick", reason)
+        f"✅ {member.mention} has been kicked. Reason: {reason or 'No reason provided'}"
+    )
 
 
 @bot.tree.command(name="ban", description="Ban a member from the server")
@@ -1749,10 +1738,6 @@ async def slash_ban(interaction: discord.Interaction, member: discord.Member, re
         f"✅ {member.mention} has been banned. Reason: {reason or 'No reason provided'}"
     )
 
-    # Database integration for ban command
-    if db_pool:
-        create_mod_case(interaction.guild.id, member.id, interaction.user.id, "ban", reason)
-
 
 @bot.tree.command(name="unban", description="Unban a user from the server")
 @app_commands.describe(
@@ -1774,11 +1759,6 @@ async def slash_unban(interaction: discord.Interaction, user_id: str):
         user = await bot.fetch_user(int(user_id))
         await interaction.guild.unban(user)
         await interaction.followup.send(f"✅ {user.mention} has been unbanned.")
-
-        # Database integration for unban command
-        if db_pool:
-            create_mod_case(interaction.guild.id, int(user_id), interaction.user.id, "unban", "User unbanned")
-
     except discord.NotFound:
         await interaction.followup.send("❌ User not found or not banned.", ephemeral=True)
     except discord.Forbidden:
@@ -1818,10 +1798,6 @@ async def slash_mute(interaction: discord.Interaction, member: discord.Member, d
         f"✅ {member.mention} has been muted for {duration} seconds. Reason: {reason or 'No reason provided'}"
     )
 
-    # Database integration for mute/timeout command
-    if db_pool:
-        create_mod_case(interaction.guild.id, member.id, interaction.user.id, "timeout", reason)
-
 
 @bot.tree.command(name="unmute", description="Unmute a member")
 @app_commands.describe(member="The member to unmute")
@@ -1856,12 +1832,6 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
         await interaction.followup.send(
             f"✅ Successfully unmuted {member.mention}!"
         )
-
-        # Database integration for unmute command
-        if db_pool:
-            create_mod_case(interaction.guild.id, member.id, interaction.user.id, "unmute",
-                            f"Unmuted by {interaction.user}")
-
     except discord.Forbidden:
         await interaction.followup.send(
             "❌ I don't have permission to unmute this member!",
@@ -1872,6 +1842,7 @@ async def slash_unmute(interaction: discord.Interaction, member: discord.Member)
             f"❌ An error occurred: {e}",
             ephemeral=True
         )
+
 
 @bot.tree.command(name="dc", description="Disconnect a user from voice")
 @app_commands.describe(member="Member to disconnect")
@@ -2668,7 +2639,392 @@ async def slash_rolecount(interaction: discord.Interaction, role: discord.Role):
 
     await interaction.response.send_message(embed=embed)
 
+# ==================================================================
+# NEW COMMANDS TO ADD TO Main.py
+# ==================================================================
+# Add these commands after the existing @bot.tree.command definitions
+# and before the error handlers section (@slash_ban.error)
+# ==================================================================
 
+@bot.tree.command(name="membercount", description="Display server member statistics")
+async def slash_membercount(interaction: discord.Interaction):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.3)
+
+    guild = interaction.guild
+
+    # Count member statuses
+    online = sum(1 for m in guild.members if m.status == discord.Status.online)
+    idle = sum(1 for m in guild.members if m.status == discord.Status.idle)
+    dnd = sum(1 for m in guild.members if m.status == discord.Status.dnd)
+    offline = sum(1 for m in guild.members if m.status == discord.Status.offline)
+
+    # Count bots vs humans
+    bots = sum(1 for m in guild.members if m.bot)
+    humans = len(guild.members) - bots
+
+    embed = discord.Embed(
+        title=f"👥 {guild.name} Member Statistics",
+        color=discord.Color.blue(),
+        timestamp=datetime.now()
+    )
+
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+
+    embed.add_field(
+        name="📊 Total Members",
+        value=f"**{len(guild.members)}**",
+        inline=False
+    )
+
+    embed.add_field(
+        name="👤 Member Types",
+        value=f"Humans: **{humans}**\nBots: **{bots}**",
+        inline=True
+    )
+
+    embed.add_field(
+        name="📱 Member Status",
+        value=f"🟢 Online: **{online}**\n🟡 Idle: **{idle}**\n🔴 DND: **{dnd}**\n⚫ Offline: **{offline}**",
+        inline=True
+    )
+
+    embed.set_footer(text=f"Requested by {interaction.user.name}")
+
+    await interaction.followup.send(embed=embed)
+
+
+@bot.tree.command(name="botinfo", description="Display bot statistics and information")
+async def slash_botinfo(interaction: discord.Interaction):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.3)
+
+    # Calculate uptime
+    uptime = datetime.now() - bot_start_time
+    days = uptime.days
+    hours, remainder = divmod(uptime.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Calculate total users across all servers
+    total_users = sum(guild.member_count for guild in bot.guilds)
+
+    embed = discord.Embed(
+        title="🤖 Bot Information",
+        description="SorynTech's Shark Moderation Bot",
+        color=discord.Color.blue(),
+        timestamp=datetime.now()
+    )
+
+    if bot.user.avatar:
+        embed.set_thumbnail(url=bot.user.avatar.url)
+
+    embed.add_field(
+        name="📊 Bot Stats",
+        value=f"Servers: **{len(bot.guilds)}**\nTotal Users: **{total_users}**\nLatency: **{round(bot.latency * 1000)}ms**",
+        inline=True
+    )
+
+    embed.add_field(
+        name="⏱️ Uptime",
+        value=f"**{days}**d **{hours}**h **{minutes}**m **{seconds}**s",
+        inline=True
+    )
+
+    embed.add_field(
+        name="🔧 Status",
+        value=f"Emergency: {'🔴 Active' if bot_emergency_shutdown else '🟢 Normal'}\nUpdate Mode: {'🟡 Active' if bot_updating else '🟢 Normal'}\nOwner Sleep: {'😴 Active' if bot_owner_sleeping else '🟢 Awake'}",
+        inline=False
+    )
+
+    embed.add_field(
+        name="📝 Bot Info",
+        value=f"Bot Name: **{bot.user.name}**\nBot ID: `{bot.user.id}`\nPrefix: `!`",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🔗 Links",
+        value="[GitHub](https://github.com/soryntech/discord-moderation-bot-) | [Uptime Status](https://stats.uptimerobot.com/EfwZKYIE1Q)",
+        inline=False
+    )
+
+    embed.set_footer(text=f"Created by SorynTech • Requested by {interaction.user.name}")
+
+    await interaction.followup.send(embed=embed)
+
+
+@bot.tree.command(name="removerole", description="Remove a role from a user")
+@app_commands.describe(
+    member="The member to remove role from",
+    role="The role to remove"
+)
+@app_commands.checks.has_permissions(manage_roles=True)
+async def slash_removerole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    if not interaction.guild.me.guild_permissions.manage_roles:
+        await interaction.followup.send("❌ I don't have permission to manage roles!", ephemeral=True)
+        return
+
+    if interaction.guild.me.top_role <= role:
+        await interaction.followup.send(
+            f"❌ I cannot remove {role.mention} because it's higher than or equal to my highest role!",
+            ephemeral=True
+        )
+        return
+
+    if interaction.user.top_role <= role and interaction.user != interaction.guild.owner:
+        await interaction.followup.send(
+            f"❌ You cannot remove {role.mention} because it's higher than or equal to your highest role!",
+            ephemeral=True
+        )
+        return
+
+    if role not in member.roles:
+        await interaction.followup.send(
+            f"❌ {member.mention} doesn't have the {role.mention} role!",
+            ephemeral=True
+        )
+        return
+
+    try:
+        await member.remove_roles(role, reason=f"Role removed by {interaction.user}")
+        await interaction.followup.send(f"✅ Successfully removed {role.mention} from {member.mention}!")
+    except discord.Forbidden:
+        await interaction.followup.send("❌ Failed to remove role due to permission issues!", ephemeral=True)
+    except discord.HTTPException as e:
+        await interaction.followup.send(f"❌ An error occurred: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="createrole", description="Create a new role with specified permissions")
+@app_commands.describe(
+    name="Name of the new role",
+    color="Color in hex format (e.g., #FF5733) - optional",
+    hoist="Whether to display role separately in member list",
+    mentionable="Whether the role can be mentioned"
+)
+@app_commands.checks.has_permissions(manage_roles=True)
+async def slash_createrole(interaction: discord.Interaction, name: str, color: str = None, hoist: bool = False, mentionable: bool = False):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    if not interaction.guild.me.guild_permissions.manage_roles:
+        await interaction.followup.send("❌ I don't have permission to manage roles!", ephemeral=True)
+        return
+
+    # Parse color if provided
+    role_color = discord.Color.default()
+    if color:
+        try:
+            # Remove # if present
+            color = color.lstrip('#')
+            # Convert hex to RGB
+            role_color = discord.Color(int(color, 16))
+        except ValueError:
+            await interaction.followup.send("❌ Invalid color format! Use hex format like #FF5733", ephemeral=True)
+            return
+
+    try:
+        new_role = await interaction.guild.create_role(
+            name=name,
+            color=role_color,
+            hoist=hoist,
+            mentionable=mentionable,
+            reason=f"Role created by {interaction.user}"
+        )
+
+        embed = discord.Embed(
+            title="✅ Role Created Successfully",
+            color=new_role.color,
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(name="Role", value=new_role.mention, inline=True)
+        embed.add_field(name="Role ID", value=f"`{new_role.id}`", inline=True)
+        embed.add_field(name="Color", value=f"`{str(new_role.color)}`", inline=True)
+        embed.add_field(name="Hoisted", value="✅ Yes" if hoist else "❌ No", inline=True)
+        embed.add_field(name="Mentionable", value="✅ Yes" if mentionable else "❌ No", inline=True)
+
+        embed.set_footer(text=f"Created by {interaction.user.name}")
+
+        await interaction.followup.send(embed=embed)
+
+    except discord.Forbidden:
+        await interaction.followup.send("❌ Failed to create role due to permission issues!", ephemeral=True)
+    except discord.HTTPException as e:
+        await interaction.followup.send(f"❌ An error occurred: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="deleterole", description="Delete a role")
+@app_commands.describe(role="The role to delete")
+@app_commands.checks.has_permissions(manage_roles=True)
+async def slash_deleterole(interaction: discord.Interaction, role: discord.Role):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.5)
+
+    if not interaction.guild.me.guild_permissions.manage_roles:
+        await interaction.followup.send("❌ I don't have permission to manage roles!", ephemeral=True)
+        return
+
+    if interaction.guild.me.top_role <= role:
+        await interaction.followup.send(
+            f"❌ I cannot delete {role.mention} because it's higher than or equal to my highest role!",
+            ephemeral=True
+        )
+        return
+
+    if interaction.user.top_role <= role and interaction.user != interaction.guild.owner:
+        await interaction.followup.send(
+            f"❌ You cannot delete {role.mention} because it's higher than or equal to your highest role!",
+            ephemeral=True
+        )
+        return
+
+    # Store role info before deletion
+    role_name = role.name
+    role_members = len(role.members)
+
+    try:
+        await role.delete(reason=f"Role deleted by {interaction.user}")
+        await interaction.followup.send(
+            f"✅ Successfully deleted role **{role_name}**\n"
+            f"📊 The role had **{role_members}** member(s)"
+        )
+    except discord.Forbidden:
+        await interaction.followup.send("❌ Failed to delete role due to permission issues!", ephemeral=True)
+    except discord.HTTPException as e:
+        await interaction.followup.send(f"❌ An error occurred: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="roleinfo", description="Display information about a role")
+@app_commands.describe(role="The role to get information about")
+async def slash_roleinfo(interaction: discord.Interaction, role: discord.Role):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.3)
+
+    embed = discord.Embed(
+        title=f"📋 Role Information",
+        color=role.color,
+        timestamp=datetime.now()
+    )
+
+    # Basic information
+    embed.add_field(name="Role Name", value=role.name, inline=True)
+    embed.add_field(name="Role ID", value=f"`{role.id}`", inline=True)
+    embed.add_field(name="Color", value=f"`{str(role.color)}`", inline=True)
+
+    # Position and settings
+    embed.add_field(name="Position", value=f"**{role.position}**", inline=True)
+    embed.add_field(name="Hoisted", value="✅ Yes" if role.hoist else "❌ No", inline=True)
+    embed.add_field(name="Mentionable", value="✅ Yes" if role.mentionable else "❌ No", inline=True)
+
+    # Member count
+    embed.add_field(name="Members", value=f"**{len(role.members)}**", inline=True)
+
+    # Managed status
+    embed.add_field(
+        name="Managed",
+        value="✅ Yes (Bot/Integration)" if role.managed else "❌ No",
+        inline=True
+    )
+
+    # Created date
+    embed.add_field(
+        name="Created On",
+        value=role.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+        inline=True
+    )
+
+    # Key permissions
+    key_perms = []
+    if role.permissions.administrator:
+        key_perms.append("👑 Administrator")
+    if role.permissions.manage_guild:
+        key_perms.append("⚙️ Manage Server")
+    if role.permissions.manage_roles:
+        key_perms.append("🎭 Manage Roles")
+    if role.permissions.manage_channels:
+        key_perms.append("📁 Manage Channels")
+    if role.permissions.kick_members:
+        key_perms.append("👢 Kick Members")
+    if role.permissions.ban_members:
+        key_perms.append("🔨 Ban Members")
+    if role.permissions.moderate_members:
+        key_perms.append("⏱️ Timeout Members")
+
+    if key_perms:
+        embed.add_field(
+            name="🔑 Key Permissions",
+            value="\n".join(key_perms),
+            inline=False
+        )
+
+    embed.set_footer(text=f"Requested by {interaction.user.name}")
+
+    await interaction.followup.send(embed=embed)
+
+
+@bot.tree.command(name="rolemembers", description="List all members with a specific role")
+@app_commands.describe(role="The role to list members for")
+async def slash_rolemembers(interaction: discord.Interaction, role: discord.Role):
+    if not await check_emergency_shutdown(interaction):
+        return
+
+    await interaction.response.defer()
+    await asyncio.sleep(0.3)
+
+    members = role.members
+
+    if not members:
+        await interaction.followup.send(f"❌ No members have the {role.mention} role!", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title=f"👥 Members with {role.name}",
+        description=f"Total: **{len(members)}** member(s)",
+        color=role.color,
+        timestamp=datetime.now()
+    )
+
+    # Split members into chunks of 20 for readability
+    chunk_size = 20
+    member_chunks = [members[i:i + chunk_size] for i in range(0, len(members), chunk_size)]
+
+    # Display first chunk inline
+    first_chunk = member_chunks[0]
+    member_list = "\n".join([f"• {member.mention} ({member.name})" for member in first_chunk])
+
+    if len(member_chunks) > 1:
+        member_list += f"\n\n*...and {len(members) - len(first_chunk)} more member(s)*"
+        member_list += f"\n\n💡 **Tip:** Use `/role-count` for just the count"
+
+    embed.add_field(name="Members", value=member_list, inline=False)
+    embed.set_footer(text=f"Requested by {interaction.user.name}")
+
+    await interaction.followup.send(embed=embed)
+
+
+#================================================ERROR HANDLING=========================================================================================================================
 # ============================================================================
 # MODERATION TRACKING COMMANDS
 # ============================================================================
@@ -3099,6 +3455,13 @@ async def slash_reason(interaction: discord.Interaction, case_id: int, reason: s
 @slash_addrole.error
 @slash_rolecount.error
 @slash_unmute.error
+@slash_membercount.error
+@slash_botinfo.error
+@slash_removerole.error
+@slash_createrole.error
+@slash_deleterole.error
+@slash_roleinfo.error
+@slash_rolemembers.error
 async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
         try:
@@ -3192,7 +3555,6 @@ if __name__ == "__main__":
     print(f"PORT: {PORT}")
     print(f"STATS_USER: {STATS_USER}")
     print(f"STATS_PASS: {'***' if STATS_PASS else 'Not Set'}")
-    print(f"SUPABASE_URL exists: {bool(SUPABASE_URL)}")
 
     if not TOKEN:
         print("ERROR: DISCORD_TOKEN not found in environment variables!")
@@ -3200,34 +3562,10 @@ if __name__ == "__main__":
     else:
         print("Starting bot...")
         try:
-            # Initialize moderation database
-            print("\n" + "=" * 60)
-            print("INITIALIZING MODERATION DATABASE")
-            print("=" * 60)
-
-            database_enabled = init_moderation_database()
-
-            if database_enabled:
-                print("✅ Moderation tracking database ready!")
-                print("📋 Commands available: /case, /warn, /warnings, /clearwarnings, /modnote, /reason")
-            else:
-                print("⚠️  Moderation tracking disabled - bot will work without database features")
-                print("💡 To enable: Add SUPABASE_URL to your .env file")
-
-            print("=" * 60)
-            print("\nStarting Discord bot...")
-            print("=" * 60 + "\n")
-
-            # Start the bot
             bot.run(TOKEN, log_handler=None)
-
         except Exception as e:
             print(f"BOT CRASHED: {e}")
             import traceback
-
             traceback.print_exc()
-        finally:
-            # Clean up database connections
-            close_database()
 
     print("=== BOT EXITED ===")
