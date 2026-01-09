@@ -533,19 +533,11 @@ def get_user_mod_notes(guild_id: int, user_id: int) -> List[Dict]:
         return []
 
 
+
 # ============================================================================
 # CLEANUP FUNCTION
 # ============================================================================
 
-     if not TOKEN:
-         print("ERROR: DISCORD_TOKEN not found in environment variables!")
-         print("Make sure your .env file contains DISCORD_TOKEN=your_token_here")
-     else:
-         print("Starting bot...")
-         try:
-             bot.run(TOKEN, log_handler=None)
-         finally:
-             close_database()
 
 # ============================================================================
 # END OF DATABASE FUNCTIONS
@@ -564,6 +556,25 @@ intents.members = True
 intents.presences = True  # Add this line
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+
+def close_database():
+    """
+    Close all database connections and clean up the connection pool.
+    Called when the bot shuts down.
+    """
+    global db_pool
+
+    try:
+        if db_pool is None:
+            print("✅ No database pool to close")
+            return
+
+        # Close all connections in the pool
+        db_pool.closeall()
+        print("✅ All database connections closed successfully")
+
+    except Exception as e:
+        print(f"❌ Error closing database connections: {e}")
 
 def load_env_file(filepath='.env'):
     if not os.path.exists(filepath):
@@ -590,6 +601,7 @@ STATS_USER = os.getenv('STATS_USER', 'admin')
 STATS_PASS = os.getenv('STATS_PASS', 'changeme')
 # Supabase Database URL (will be loaded from .env)
 SUPABASE_URL = os.getenv('SUPABASE_URL')
+
 
 # Connection pool for database
 db_pool = None
@@ -3229,9 +3241,7 @@ if __name__ == "__main__":
         print("Starting bot...")
         try:
             bot.run(TOKEN, log_handler=None)
-        except Exception as e:
-            print(f"BOT CRASHED: {e}")
-            import traceback
-            traceback.print_exc()
+        finally:
+            close_database()
 
     print("=== BOT EXITED ===")
