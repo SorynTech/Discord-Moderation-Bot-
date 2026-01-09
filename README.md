@@ -204,6 +204,8 @@ All status pages feature:
 - [ ] `setlogchannel` - Set a channel for mod logs
 - [ ] `togglelog` - Enable/disable specific log events
 - [ ] `automod` - Toggle automod features (anti-spam, anti-caps, etc.)
+### DATABASE FOR MODERATION COMMANDS
+- [ ] Integreate to SupaBase DataBase on a new account
 
 ---
 
