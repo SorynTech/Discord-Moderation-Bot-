@@ -1854,6 +1854,54 @@ async def on_command_error(ctx, error):
             await ctx.send("⚠️ Bot is being rate limited. Please wait a moment.")
 
 
+# =============================
+# FOR DISCORD.PY (app_commands)
+# =============================
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    """Global error handler for app commands (discord.py)"""
+
+    if isinstance(error, app_commands.MissingPermissions):
+        message = "❌ You don't have permission to use this command!"
+
+    elif isinstance(error, app_commands.BotMissingPermissions):
+        message = "❌ I don't have the required permissions to execute this command!"
+
+    elif isinstance(error, app_commands.CommandOnCooldown):
+        message = f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds."
+
+    elif isinstance(error, app_commands.MissingRole):
+        message = "❌ You don't have the required role to use this command!"
+
+    elif isinstance(error, app_commands.CheckFailure):
+        message = "❌ You don't have permission to use this command!"
+
+    elif isinstance(error, discord.Forbidden):
+        message = "❌ I don't have permission to perform this action!"
+
+    elif isinstance(error, discord.HTTPException):
+        message = f"❌ A network error occurred: {str(error)[:100]}"
+        print(f"HTTPException: {error}")
+
+    elif isinstance(error, discord.NotFound):
+        message = "❌ The requested resource was not found."
+
+    else:
+        message = "❌ An unexpected error occurred while executing this command."
+        print(f"Unexpected error in command: {type(error).__name__}: {error}")
+        import traceback
+        traceback.print_exception(type(error), error, error.__traceback__)
+
+    # Send the error message
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+    except Exception as e:
+        print(f"Failed to send error message: {e}")
+
+
 @app_commands.checks.has_permissions(kick_members=True)
 async def slash_kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     """Kick a member from the server"""
@@ -3876,84 +3924,6 @@ async def slash_modnotes(interaction: discord.Interaction, member: discord.Membe
 
     await interaction.followup.send(embed=embed, ephemeral=True)
 # Error handling
-@slash_ban.error
-@slash_kick.error
-@slash_mute.error
-@slash_servermute.error
-@slash_unban.error
-@slash_userpicture.error
-@slash_userbanner.error
-@slash_userinfo.error
-@slash_disconnect.error
-@slash_deaf.error
-@slash_unmute_voice.error
-@slash_undeaf_voice.error
-@slash_purge_messages.error
-@slash_lockdown.error
-@slash_unlockserver.error
-@slash_nickname.error
-@slash_serverinfo.error
-@slash_ping.error
-@slash_addrole.error
-@slash_rolecount.error
-@slash_unmute.error
-@slash_membercount.error
-@slash_botinfo.error
-@slash_removerole.error
-@slash_createrole.error
-@slash_deleterole.error
-@slash_roleinfo.error
-@slash_rolemembers.error
-async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.MissingPermissions):
-        try:
-            await interaction.response.send_message(
-                "❌ You don't have permission to use this command!",
-                ephemeral=True
-            )
-        except:
-            await interaction.followup.send(
-                "❌ You don't have permission to use this command!",
-                ephemeral=True
-            )
-    elif isinstance(error, app_commands.BotMissingPermissions):
-        try:
-            await interaction.response.send_message(
-                "❌ I don't have the required permissions to execute this command!",
-                ephemeral=True
-            )
-        except:
-            await interaction.followup.send(
-                "❌ I don't have the required permissions to execute this command!",
-                ephemeral=True
-            )
-    elif isinstance(error, app_commands.CommandOnCooldown):
-        try:
-            await interaction.response.send_message(
-                f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.",
-                ephemeral=True
-            )
-        except:
-            await interaction.followup.send(
-                f"⏰ This command is on cooldown. Try again in {error.retry_after:.2f} seconds.",
-                ephemeral=True
-            )
-    else:
-        print(f"Unexpected error in command: {error}")
-        try:
-            await interaction.response.send_message(
-                "❌ An unexpected error occurred while executing this command.",
-                ephemeral=True
-            )
-        except:
-            try:
-                await interaction.followup.send(
-                    "❌ An unexpected error occurred while executing this command.",
-                    ephemeral=True
-                )
-            except:
-                pass
-
 
 @bot.command(name='kick')
 @commands.has_permissions(kick_members=True)
