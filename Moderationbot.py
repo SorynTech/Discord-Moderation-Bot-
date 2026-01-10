@@ -2751,6 +2751,7 @@ async def slash_owner_sleep(interaction: discord.Interaction):
     bot_owner_sleeping = not bot_owner_sleeping
 
     if bot_owner_sleeping:
+        await bot.change_presence(status=discord.Status.dnd)
         await interaction.response.send_message(
             "😴 **OWNER SLEEP STATUS ENABLED**\n"
             "The status page now shows 'Shark Owner is Sleeping' with the message about GitHub PRs.\n"
@@ -2758,6 +2759,7 @@ async def slash_owner_sleep(interaction: discord.Interaction):
             ephemeral=True
         )
     else:
+        await bot.change_presence(status=discord.Status.online)
         await interaction.response.send_message(
             "✅ **OWNER SLEEP STATUS DISABLED**\n"
             "The status page now shows normal bot status.",
