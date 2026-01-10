@@ -2751,20 +2751,21 @@ async def slash_owner_sleep(interaction: discord.Interaction):
     bot_owner_sleeping = not bot_owner_sleeping
 
     if bot_owner_sleeping:
+        await bot.change_presence(status=discord.Status.dnd)
         await interaction.response.send_message(
             "😴 **OWNER SLEEP STATUS ENABLED**\n"
             "The status page now shows 'Shark Owner is Sleeping' with the message about GitHub PRs.\n"
             "⚠️ Note: Bot commands remain fully functional.",
             ephemeral=True
         )
-await     bot.change_presence(status=discord.Status.DND)
     else:
+        await bot.change_presence(status=discord.Status.online)
         await interaction.response.send_message(
             "✅ **OWNER SLEEP STATUS DISABLED**\n"
             "The status page now shows normal bot status.",
             ephemeral=True
         )
-await bot.change_presence(status=discord.Status.online)
+
 
 @bot.tree.command(name="update-mode", description="Toggle update mode for the bot status page (Owner Only)")
 async def slash_updatemode(interaction: discord.Interaction):
