@@ -2757,14 +2757,14 @@ async def slash_owner_sleep(interaction: discord.Interaction):
             "⚠️ Note: Bot commands remain fully functional.",
             ephemeral=True
         )
-        bot.change_presence(status=discord.Status.DND)
+await     bot.change_presence(status=discord.Status.DND)
     else:
         await interaction.response.send_message(
             "✅ **OWNER SLEEP STATUS DISABLED**\n"
             "The status page now shows normal bot status.",
             ephemeral=True
         )
-
+await bot.change_presence(status=discord.Status.online)
 
 @bot.tree.command(name="update-mode", description="Toggle update mode for the bot status page (Owner Only)")
 async def slash_updatemode(interaction: discord.Interaction):
