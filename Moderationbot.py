@@ -2757,6 +2757,7 @@ async def slash_owner_sleep(interaction: discord.Interaction):
             "⚠️ Note: Bot commands remain fully functional.",
             ephemeral=True
         )
+        bot.change_presence(status=discord.Status.DND)
     else:
         await interaction.response.send_message(
             "✅ **OWNER SLEEP STATUS DISABLED**\n"
