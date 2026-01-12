@@ -399,7 +399,10 @@ Once the bot is running, access the status page at:
 
 ## 🔄 Recent Updates
 
-### December 30, 2025 (Latest)
+### January 10, 2025 (LATEST)
+- 🛑 Added Do Not disturb Status for Owner-Sleep
+
+### December 30, 2025 
 - 🔧 Added token debug script for troubleshooting without logging in
 - 🤖 Debug script fetches bot username directly from Discord API
 - 🎨 Updated status page titles: "Shark Bot is Offline" and "Shark Bot is Updating"
